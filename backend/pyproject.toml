@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # erreurs de style pycodestyle
+    "F",   # erreurs pyflakes (variables inutilisées, imports morts, etc.)
+    "I",   # tri automatique des imports
+    "UP",  # suggestions de modernisation Python
+    "B",   # détection de bugs fréquents
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"

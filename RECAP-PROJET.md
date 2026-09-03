@@ -170,6 +170,39 @@ Ces éléments ne figuraient pas explicitement dans le cahier des charges mais s
 - **Structure de dossiers claire** : backend organisé en `routers/`, `models/`, `schemas/`, `services/`, `core/` ; frontend organisé en `pages/`, `components/`, `api/`, `hooks/`, `types/`.
 - **Base de données locale via Docker** : plutôt que de dépendre de Supabase (en ligne) dès le développement, une base PostgreSQL identique tourne en local sur la machine, avec l'extension pgvector déjà activée (utile aussi bien en V1 qu'en V2). Le code écrit sera directement compatible avec Supabase au moment du déploiement.
 
-## 8. Prochaine étape
+## 8. Journal d'avancement (état au 03/09/2026)
 
-Écriture du premier modèle de données (`User`) avec les champs RGPD intégrés dès le départ (consentement, suppression différée), puis mise en place des routes d'inscription et de connexion — première brique de l'ordre de réalisation du cahier des charges (section 7).
+### Ce qui est fait et fonctionnel
+
+- **Projet Git** initialisé et poussé sur GitHub : https://github.com/GCS2092/talent-d-afrique
+- **Structure de dossiers** complète (backend en `app/{core,routers,models,schemas,services}`, frontend en `src/{pages,components,api,hooks,types}`)
+- **Backend FastAPI qui démarre et répond** :
+  - `app/main.py` — point d'entrée, CORS configuré pour parler au frontend
+  - `app/core/config.py` — lecture centralisée des variables d'environnement
+  - `app/core/database.py` — connexion SQLAlchemy préparée (pas encore branchée à une vraie base)
+  - `app/routers/health.py` — route de test `/api/health`
+  - Vérifié fonctionnel sur `http://localhost:8000`, `/api/health` et `/docs`
+- **Qualité de code en place** : Ruff configuré (`pyproject.toml`), pre-commit installé (`.pre-commit-config.yaml`)
+- **Frontend React + Vite fonctionnel** avec Tailwind CSS v4, page d'accueil avec la charte bleu/orange/blanc et le sélecteur des 4 profils
+- **Scripts pratiques** créés dans `scripts/` : `install.ps1` (tout installer), `dev.ps1` (tout lancer), `check.ps1` (vérifier le code)
+- **Toutes les décisions structurantes tranchées** (sécurité, RGPD, pondération du matching, charte graphique, KPIs) — voir section 6 de ce document
+
+### Ce qui N'EST PAS encore fait
+
+- ❌ **Aucune base de données réelle connectée.** Un compte Supabase doit encore être créé (choix retenu à la place de Docker, pour raison d'espace disque). Tant que ce n'est pas fait, `DATABASE_URL` dans `.env` pointe vers une base locale qui n'existe pas — normal, ça ne bloque que les futures routes qui toucheront à la base.
+- ❌ Aucun modèle de données (`User`) n'est encore écrit.
+- ❌ Aucune route d'inscription/connexion réelle.
+- ❌ Le routing frontend (`react-router-dom`) n'est pas encore branché — une seule page existe pour l'instant.
+- ⚠️ **Point de vigilance immédiat** : au moment de la dernière session, un `git commit` incomplet a été détecté — plusieurs fichiers backend (config, database, main.py, health.py, pyproject.toml) risquaient de ne pas être sauvegardés sur GitHub. À vérifier en tout premier lieu à la reprise avec `git status`, et committer/pousser ce qui manque si nécessaire.
+
+### Prochaines étapes, dans l'ordre
+
+1. Vérifier que `git status` est propre et que tout est bien poussé sur GitHub
+2. Créer le compte Supabase (base de données + activer l'extension pgvector)
+3. Brancher le vrai `DATABASE_URL` dans `.env`
+4. Écrire le modèle `User` en SQLAlchemy avec les champs RGPD (consentement, suppression différée)
+5. Créer les routes d'inscription et de connexion (avec hash bcrypt + JWT)
+6. Brancher le routing frontend (pages `/inscription`, `/connexion`)
+7. Tester le tout de bout en bout : inscription depuis le frontend → sauvegarde réelle en base
+
+Cette liste correspond au tout début de l'étape 1 de l'ordre de réalisation du cahier des charges (section 7) : « Socle : inscription, connexion sécurisée, gestion de compte, choix du type de profil ».

@@ -10,8 +10,8 @@ const inscriptionSchema = z.object({
   email: z.string().email('Adresse email invalide'),
   motDePasse: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères'),
   consentement: z.literal(true, {
-    errorMap: () => ({ message: 'Vous devez accepter les CGU pour continuer' }),
-  }),
+  error: 'Vous devez accepter les CGU pour continuer',
+}),
 })
 
 type InscriptionForm = z.infer<typeof inscriptionSchema>
@@ -87,10 +87,14 @@ export default function Inscription() {
             <input type="checkbox" {...register('consentement')} className="mt-1" />
             <label className="text-sm text-slate-600">
               J'accepte les{' '}
-              <a href="#" className="text-blue-700 underline">
+              <a href="/cgu" target="_blank" className="text-blue-700 underline">
                 conditions générales d'utilisation
               </a>{' '}
-              et la politique de confidentialité.
+              et la{' '}
+              <a href="/confidentialite" target="_blank" className="text-blue-700 underline">
+                politique de confidentialité
+              </a>
+              .
             </label>
           </div>
           {errors.consentement && (

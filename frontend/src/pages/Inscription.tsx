@@ -1,23 +1,31 @@
-import { useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { isAxiosError } from 'axios'
 import Header from '../components/Header'
 import { PROFILES, type ProfileType } from '../types/profile'
+import { registerUser } from '../api/auth'
+
+const CONSENT_VERSION = '2026-09-04'
 
 const inscriptionSchema = z.object({
   nom: z.string().min(2, 'Le nom doit contenir au moins 2 caractères'),
   email: z.string().email('Adresse email invalide'),
   motDePasse: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères'),
   consentement: z.literal(true, {
-  error: 'Vous devez accepter les CGU pour continuer',
-}),
+    error: 'Vous devez accepter les CGU pour continuer',
+  }),
 })
 
 type InscriptionForm = z.infer<typeof inscriptionSchema>
 
 export default function Inscription() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const [erreurServeur, setErreurServeur] = useState<string | null>(null)
+
   const profilInitial = searchParams.get('profil') as ProfileType | null
   const profil = PROFILES.find((p) => p.id === profilInitial)
 
@@ -29,10 +37,32 @@ export default function Inscription() {
     resolver: zodResolver(inscriptionSchema),
   })
 
-  const onSubmit = (data: InscriptionForm) => {
-    // TODO : brancher sur l'API backend une fois Supabase configuré
-    console.log('Inscription :', { ...data, profil: profilInitial })
-    alert('Backend pas encore branché — vérifie la console pour voir les données du formulaire.')
+  const onSubmit = async (data: InscriptionForm) => {
+    setErreurServeur(null)
+
+    if (!profilInitial) {
+      setErreurServeur('Veuillez choisir un profil depuis la page d\'accueil.')
+      return
+    }
+
+    try {
+      await registerUser({
+        nom: data.nom,
+        email: data.email,
+        mot_de_passe: data.motDePasse,
+        type_profil: profilInitial,
+        consentement: data.consentement,
+        consent_version: CONSENT_VERSION,
+      })
+
+      navigate(`/dashboard/${profilInitial}`)
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.data?.detail) {
+        setErreurServeur(error.response.data.detail)
+      } else {
+        setErreurServeur('Une erreur est survenue. Veuillez réessayer.')
+      }
+    }
   }
 
   return (
@@ -52,6 +82,12 @@ export default function Inscription() {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
+          {erreurServeur && (
+            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+              {erreurServeur}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-700">Nom complet</label>
             <input
@@ -106,7 +142,7 @@ export default function Inscription() {
             disabled={isSubmitting}
             className="w-full rounded-lg bg-blue-700 py-2.5 font-medium text-white hover:bg-blue-800 disabled:opacity-50"
           >
-            Créer mon compte
+            {isSubmitting ? 'Création en cours...' : 'Créer mon compte'}
           </button>
         </form>
       </div>

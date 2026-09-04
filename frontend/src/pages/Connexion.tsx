@@ -1,7 +1,11 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { isAxiosError } from 'axios'
 import Header from '../components/Header'
+import { loginUser } from '../api/auth'
 
 const connexionSchema = z.object({
   email: z.string().email('Adresse email invalide'),
@@ -11,6 +15,9 @@ const connexionSchema = z.object({
 type ConnexionForm = z.infer<typeof connexionSchema>
 
 export default function Connexion() {
+  const navigate = useNavigate()
+  const [erreurServeur, setErreurServeur] = useState<string | null>(null)
+
   const {
     register,
     handleSubmit,
@@ -19,10 +26,26 @@ export default function Connexion() {
     resolver: zodResolver(connexionSchema),
   })
 
-  const onSubmit = (data: ConnexionForm) => {
-    // TODO : brancher sur l'API backend une fois Supabase configuré
-    console.log('Connexion :', data)
-    alert('Backend pas encore branché — vérifie la console pour voir les données du formulaire.')
+  const onSubmit = async (data: ConnexionForm) => {
+    setErreurServeur(null)
+
+    try {
+      const { access_token } = await loginUser({
+        email: data.email,
+        mot_de_passe: data.motDePasse,
+      })
+
+      // Stockage temporaire simple ; a ameliorer plus tard (ex: httpOnly cookie)
+      localStorage.setItem('access_token', access_token)
+
+      navigate('/')
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.data?.detail) {
+        setErreurServeur(error.response.data.detail)
+      } else {
+        setErreurServeur('Une erreur est survenue. Veuillez réessayer.')
+      }
+    }
   }
 
   return (
@@ -34,6 +57,12 @@ export default function Connexion() {
         <p className="mt-2 text-slate-600">Accédez à votre espace Talent d'Afrique.</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
+          {erreurServeur && (
+            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+              {erreurServeur}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-700">Email</label>
             <input
@@ -61,7 +90,7 @@ export default function Connexion() {
             disabled={isSubmitting}
             className="w-full rounded-lg bg-blue-700 py-2.5 font-medium text-white hover:bg-blue-800 disabled:opacity-50"
           >
-            Se connecter
+            {isSubmitting ? 'Connexion en cours...' : 'Se connecter'}
           </button>
         </form>
       </div>

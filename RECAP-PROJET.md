@@ -176,40 +176,43 @@ Ces éléments ne figuraient pas explicitement dans le cahier des charges mais s
 
 - **Projet Git** initialisé et poussé sur GitHub : https://github.com/GCS2092/talent-d-afrique
 - **Structure de dossiers** complète (backend en `app/{core,routers,models,schemas,services}`, frontend en `src/{pages,components,api,hooks,types}`)
-- **Backend FastAPI qui démarre et répond** :
-  - `app/main.py` — point d'entrée, CORS configuré pour parler au frontend
-  - `app/core/config.py` — lecture centralisée des variables d'environnement
-  - `app/core/database.py` — connexion SQLAlchemy préparée (pas encore branchée à une vraie base)
-  - `app/routers/health.py` — route de test `/api/health`
-  - Vérifié fonctionnel sur `http://localhost:8000`, `/api/health` et `/docs`
-- **Qualité de code en place** : Ruff configuré (`pyproject.toml`), pre-commit installé (`.pre-commit-config.yaml`)
-- **Frontend React + Vite + Tailwind CSS v4 entièrement routé** (react-router-dom) :
-  - `pages/Accueil.tsx` — sélection de profil, redirige vers l'inscription avec le profil choisi dans l'URL
-  - `pages/Inscription.tsx` — formulaire complet avec validation Zod (nom, email, mot de passe, consentement RGPD obligatoire)
-  - `pages/Connexion.tsx` — formulaire de connexion avec validation
-  - `pages/CGU.tsx` et `pages/Confidentialite.tsx` — pages légales liées au consentement RGPD, avec système de version (`VERSION_CGU`) pour tracer quelle version un utilisateur a acceptée
-  - `pages/DashboardEntreprise.tsx`, `DashboardEtudiant.tsx`, `DashboardEcole.tsx`, `DashboardFreelance.tsx` — coquilles vides par profil, à remplir une fois le backend connecté
-  - `pages/NotFound.tsx` — page 404
-  - `components/Header.tsx` — navigation partagée entre toutes les pages
-  - `types/profile.ts` — typage partagé des 4 profils
-  - Tous les formulaires valident correctement et affichent les erreurs, mais n'envoient pas encore de données réelles (`alert()` de test à la place d'un appel API, en attendant la connexion au backend)
-- **Scripts pratiques** créés dans `scripts/` : `install.ps1` (tout installer), `dev.ps1` (tout lancer), `check.ps1` (vérifier le code)
-- **Toutes les décisions structurantes tranchées** (sécurité, RGPD, pondération du matching, charte graphique, KPIs) — voir section 6 de ce document
+- **Base de données PostgreSQL locale** (via pgAdmin4) connectée et fonctionnelle — pgvector volontairement laissé de côté pour l'instant (utile seulement à partir de l'étape 12, matching V2)
+- **Backend FastAPI complet pour le socle d'authentification** :
+  - `app/models/user.py` — modèle `User` avec UUID portable et champs RGPD (consentement horodaté et versionné, suppression logique)
+  - `app/core/security.py` — hash bcrypt (implémentation directe, sans passlib — voir point de vigilance ci-dessous) et gestion des tokens JWT
+  - `app/schemas/user.py` — validation des données d'entrée/sortie
+  - `app/routers/auth.py` — routes `/api/auth/register` et `/api/auth/login`, avec gestion des doublons d'email et des mots de passe incorrects
+  - **Testé de bout en bout avec succès** : inscription, connexion, doublon d'email rejeté, mot de passe erroné rejeté
+- **Qualité de code en place** : Ruff configuré, pre-commit installé
+- **Frontend React + Vite + Tailwind CSS v4 entièrement routé et connecté au backend** :
+  - Toutes les pages (Accueil, Inscription, Connexion, CGU, Confidentialité, 4 dashboards, 404)
+  - `api/client.ts` et `api/auth.ts` — connexion réelle à l'API backend via axios
+  - Formulaires d'inscription et de connexion branchés sur les vraies routes, avec affichage des erreurs serveur (ex : email déjà utilisé)
+  - Menu mobile responsive (hamburger) dans le header
+  - **Testé de bout en bout avec succès** : inscription depuis le frontend → sauvegarde réelle en base → redirection vers le bon dashboard ; connexion → récupération d'un token JWT
+- **Scripts pratiques** dans `scripts/` : `install.ps1`, `dev.ps1`, `check.ps1`
+- **Toutes les décisions structurantes tranchées** (sécurité, RGPD, pondération du matching, charte graphique, KPIs) — voir section 6
+
+### Points de vigilance identifiés en cours de route
+
+- ⚠️ **passlib a été abandonné au profit de la librairie `bcrypt` directe.** passlib (dernière mise à jour en 2020) est incompatible avec les versions récentes de bcrypt (bug connu et non corrigé depuis 2023). Le hash reste bcrypt avec un coût de 12, conforme à la décision initiale — seule l'implémentation a changé, pas le niveau de sécurité.
+- ⚠️ **Le token JWT est actuellement stocké dans `localStorage` côté frontend.** C'est suffisant pour tester, mais ce n'est pas la méthode la plus sécurisée (vulnérable en cas de faille XSS). À migrer vers un cookie `httpOnly` avant la mise en production.
+- ⚠️ **`Base.metadata.create_all()` est utilisé pour créer les tables automatiquement en développement.** Cette méthode ne doit pas servir en production — Alembic (déjà installé) devra prendre le relai avec de vraies migrations avant le déploiement.
+- ⚠️ pgvector n'est pas installé sur l'instance PostgreSQL locale (nécessite une compilation manuelle sous Windows, mise de côté pour l'instant). À réévaluer à l'approche de l'étape 12 (matching V2), ou réglé automatiquement si bascule vers Supabase (qui l'a nativement).
 
 ### Ce qui N'EST PAS encore fait
 
-- ❌ **Aucune base de données réelle connectée.** Tentative de création d'un projet Supabase en cours — un incident temporaire côté Supabase (dégradation de leur API Gateway) a bloqué une première tentative, à réessayer.
-- ❌ Aucun modèle de données (`User`) n'est encore écrit.
-- ❌ Aucune route d'inscription/connexion réelle côté backend.
-- ❌ Les formulaires frontend ne sont pas encore branchés à l'API (actuellement juste un `console.log` + `alert()` de test).
+- ❌ Bascule vers Supabase en production (actuellement tout tourne sur la base PostgreSQL locale via pgAdmin4)
+- ❌ Migrations Alembic proprement configurées
+- ❌ Route de récupération du profil utilisateur connecté (`/me`), export RGPD, suppression de compte
+- ❌ Protection des routes par JWT (middleware de vérification du token sur les futures routes sensibles)
+- ❌ Étape 2 du cahier des charges : profils complets (entreprise, étudiant, école, freelance) et parsing de CV
 
 ### Prochaines étapes, dans l'ordre
 
-1. Finaliser la création du projet Supabase (pgvector activé, Data API désactivée, RLS automatique activée)
-2. Brancher le vrai `DATABASE_URL` dans `.env`
-3. Écrire le modèle `User` en SQLAlchemy avec les champs RGPD (consentement, suppression différée)
-4. Créer les routes d'inscription et de connexion (avec hash bcrypt + JWT)
-5. Remplacer les `alert()` de test dans `Inscription.tsx` et `Connexion.tsx` par de vrais appels `axios` vers l'API
-6. Tester le tout de bout en bout : inscription depuis le frontend → sauvegarde réelle en base → redirection vers le bon dashboard selon le profil
+1. Ajouter une route `/api/auth/me` protégée par JWT, pour récupérer les infos de l'utilisateur connecté
+2. Gérer la persistance de session côté frontend (afficher "Connecté en tant que..." dans le header, bouton de déconnexion)
+3. Attaquer l'étape 2 du cahier des charges : construire les profils complets par type d'utilisateur
+4. Revenir sur les points de vigilance (cookie httpOnly, Alembic) avant toute mise en ligne réelle
 
-Cette liste correspond au tout début de l'étape 1 de l'ordre de réalisation du cahier des charges (section 7) : « Socle : inscription, connexion sécurisée, gestion de compte, choix du type de profil ».
+Cette liste correspond à la fin de l'étape 1 du cahier des charges (section 7) et au tout début de l'étape 2.

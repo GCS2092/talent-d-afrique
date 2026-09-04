@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Base de données
+    # Base de donnees
     database_url: str = "postgresql://postgres:password123@localhost:5432/talent_afrique"
 
     # Securite
@@ -16,6 +16,9 @@ class Settings(BaseSettings):
 
     # Frontend (pour CORS)
     frontend_url: str = "http://localhost:5173"
+
+    # Stockage fichiers (CV)
+    cv_storage_dir: str = "./storage/cvs"
 
     class Config:
         env_file = ".env"

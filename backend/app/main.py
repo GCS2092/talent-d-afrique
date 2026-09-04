@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.database import engine  # noqa: F401
 from app.core.limiter import limiter
 from app.models import profiles, user  # noqa: F401
-from app.routers import auth, health, users
+from app.routers import auth, cv, health, users
 from app.routers import profiles as profiles_router
 
 app = FastAPI(
@@ -31,6 +31,7 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(profiles_router.router, prefix="/api/profiles", tags=["profiles"])
+app.include_router(cv.router, prefix="/api/profiles", tags=["cv"])
 
 
 @app.get("/")

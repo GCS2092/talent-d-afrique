@@ -4,7 +4,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
-from app.core.database import Base, engine
+from app.core.database import engine  # noqa: F401
 from app.core.limiter import limiter
 from app.models import user  # noqa: F401
 from app.routers import auth, health, users
@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 # Cree les tables si elles n'existent pas encore (dev local ; Alembic prendra le relai pour la prod)
-Base.metadata.create_all(bind=engine)
+
 
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

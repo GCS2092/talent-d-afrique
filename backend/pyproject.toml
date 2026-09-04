@@ -10,7 +10,7 @@ select = [
     "UP",  # suggestions de modernisation Python
     "B",   # détection de bugs fréquents
 ]
-ignore = []
+ignore = ["B008"]  # Depends(...) dans les arguments par defaut est le fonctionnement normal de FastAPI
 
 [tool.ruff.format]
 quote-style = "double"

@@ -1,18 +1,34 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.deps import get_current_user
+from app.core.limiter import limiter
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 from app.models.user import User
-from app.schemas.user import Token, UserCreate, UserLogin, UserOut
+from app.schemas.user import (
+    AccessTokenOut,
+    RefreshRequest,
+    Token,
+    UserCreate,
+    UserLogin,
+    UserOut,
+)
 
 router = APIRouter()
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(payload: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
     if not payload.consentement:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -42,7 +58,8 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(payload: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
 
     if not user or not verify_password(payload.mot_de_passe, user.mot_de_passe_hash):
@@ -57,5 +74,32 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
             detail="Ce compte est desactive.",
         )
 
-    access_token = create_access_token(data={"sub": str(user.id)})
-    return Token(access_token=access_token)
+    return Token(
+        access_token=create_access_token(str(user.id)),
+        refresh_token=create_refresh_token(str(user.id)),
+    )
+
+
+@router.post("/refresh", response_model=AccessTokenOut)
+def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
+    token_data = decode_token(payload.refresh_token)
+
+    if token_data is None or token_data.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token invalide ou expire.",
+        )
+
+    user = db.query(User).filter(User.id == token_data.get("sub")).first()
+    if user is None or not user.is_active or user.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utilisateur introuvable ou compte desactive.",
+        )
+
+    return AccessTokenOut(access_token=create_access_token(str(user.id)))
+
+
+@router.get("/me", response_model=UserOut)
+def read_current_user(current_user: User = Depends(get_current_user)):
+    return current_user

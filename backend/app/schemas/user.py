@@ -19,6 +19,11 @@ class UserLogin(BaseModel):
     mot_de_passe: str
 
 
+class UserUpdate(BaseModel):
+    nom: str | None = Field(default=None, min_length=2)
+    email: EmailStr | None = None
+
+
 class UserOut(BaseModel):
     id: uuid.UUID
     nom: str
@@ -31,5 +36,15 @@ class UserOut(BaseModel):
 
 
 class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class AccessTokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

@@ -8,9 +8,11 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.candidature import Candidature
 from app.models.offre import Offre
-from app.models.profiles import EntrepriseProfile
+from app.models.profiles import EntrepriseProfile, EtudiantProfile, FreelanceProfile
 from app.models.user import User
 from app.schemas.candidature import CandidatureCreate, CandidatureOut, CandidatureStatutUpdate
+from app.schemas.matching import CandidatureAvecScore
+from app.services.matching import calculer_score_matching
 
 router = APIRouter()
 
@@ -115,6 +117,60 @@ def list_candidatures_for_offre(
         .order_by(Candidature.created_at.desc())
         .all()
     )
+
+
+@router.get("/offre/{offre_id}/classees", response_model=list[CandidatureAvecScore])
+def list_candidatures_classees(
+    offre_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Dashboard entreprise : candidats tries par score de compatibilite (cf. section 2.2)."""
+    offre = _get_offre_owned_by_current_entreprise(offre_id, current_user, db)
+
+    candidatures = db.query(Candidature).filter(Candidature.offre_id == offre_id).all()
+
+    resultats = []
+    for candidature in candidatures:
+        candidat = candidature.candidat
+
+        if candidat.type_profil == "etudiant":
+            profile = (
+                db.query(EtudiantProfile).filter(EtudiantProfile.user_id == candidat.id).first()
+            )
+            competences = profile.competences if profile else None
+            disponibilite = profile.disponibilite if profile else None
+            annees_experience = None
+        else:
+            profile = (
+                db.query(FreelanceProfile).filter(FreelanceProfile.user_id == candidat.id).first()
+            )
+            competences = profile.competences if profile else None
+            disponibilite = profile.disponibilite if profile else None
+            annees_experience = profile.annees_experience if profile else None
+
+        matching = calculer_score_matching(
+            candidat_competences=competences,
+            candidat_disponibilite=disponibilite,
+            candidat_annees_experience=annees_experience,
+            offre_competences_obligatoires=offre.competences_obligatoires,
+            offre_competences_souhaitees=offre.competences_souhaitees,
+            offre_soft_skills=offre.soft_skills,
+            offre_disponibilite=offre.disponibilite,
+            offre_niveau_experience=offre.niveau_experience,
+        )
+
+        resultats.append(
+            CandidatureAvecScore(
+                **CandidatureOut.model_validate(candidature).model_dump(),
+                score_global=matching["score_global"],
+                recommandee=matching["recommandee"],
+                detail_score=matching["detail"],
+            )
+        )
+
+    resultats.sort(key=lambda c: c.score_global, reverse=True)
+    return resultats
 
 
 @router.patch("/{candidature_id}/statut", response_model=CandidatureOut)

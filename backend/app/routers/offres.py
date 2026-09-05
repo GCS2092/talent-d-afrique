@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.offre import Offre
-from app.models.profiles import EntrepriseProfile
+from app.models.profiles import EntrepriseProfile, EtudiantProfile, FreelanceProfile
 from app.models.user import User
+from app.schemas.matching import OffreAvecScore
 from app.schemas.offre import OffreCreate, OffreOut, OffreUpdate
+from app.services.matching import calculer_score_matching
 
 router = APIRouter()
 
@@ -90,6 +92,59 @@ def list_my_offres(
         .order_by(Offre.created_at.desc())
         .all()
     )
+
+
+@router.get("/recommandees", response_model=list[OffreAvecScore])
+def list_offres_recommandees(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Offres actives triees par score de compatibilite decroissant (cf. section 2.3)."""
+    if current_user.type_profil == "etudiant":
+        profile = (
+            db.query(EtudiantProfile).filter(EtudiantProfile.user_id == current_user.id).first()
+        )
+        candidat_competences = profile.competences if profile else None
+        candidat_disponibilite = profile.disponibilite if profile else None
+        candidat_annees_experience = None
+    elif current_user.type_profil == "freelance":
+        profile = (
+            db.query(FreelanceProfile).filter(FreelanceProfile.user_id == current_user.id).first()
+        )
+        candidat_competences = profile.competences if profile else None
+        candidat_disponibilite = profile.disponibilite if profile else None
+        candidat_annees_experience = profile.annees_experience if profile else None
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seuls les etudiants et freelances ont acces a des recommandations.",
+        )
+
+    offres_actives = db.query(Offre).filter(Offre.statut == "active").all()
+
+    resultats = []
+    for offre in offres_actives:
+        matching = calculer_score_matching(
+            candidat_competences=candidat_competences,
+            candidat_disponibilite=candidat_disponibilite,
+            candidat_annees_experience=candidat_annees_experience,
+            offre_competences_obligatoires=offre.competences_obligatoires,
+            offre_competences_souhaitees=offre.competences_souhaitees,
+            offre_soft_skills=offre.soft_skills,
+            offre_disponibilite=offre.disponibilite,
+            offre_niveau_experience=offre.niveau_experience,
+        )
+        resultats.append(
+            OffreAvecScore(
+                **OffreOut.model_validate(offre).model_dump(),
+                score_global=matching["score_global"],
+                recommandee=matching["recommandee"],
+                detail_score=matching["detail"],
+            )
+        )
+
+    resultats.sort(key=lambda o: o.score_global, reverse=True)
+    return resultats
 
 
 @router.get("/{offre_id}", response_model=OffreOut)

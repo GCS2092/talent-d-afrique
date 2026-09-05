@@ -6,8 +6,8 @@ from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.database import engine  # noqa: F401
 from app.core.limiter import limiter
-from app.models import offre, profiles, user  # noqa: F401
-from app.routers import auth, cv, health, offres, users
+from app.models import candidature, offre, profiles, user  # noqa: F401
+from app.routers import auth, candidatures, cv, health, offres, users
 from app.routers import profiles as profiles_router
 
 app = FastAPI(
@@ -33,6 +33,7 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(profiles_router.router, prefix="/api/profiles", tags=["profiles"])
 app.include_router(cv.router, prefix="/api/profiles", tags=["cv"])
 app.include_router(offres.router, prefix="/api/offres", tags=["offres"])
+app.include_router(candidatures.router, prefix="/api/candidatures", tags=["candidatures"])
 
 
 @app.get("/")

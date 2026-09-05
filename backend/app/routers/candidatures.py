@@ -10,7 +10,7 @@ from app.models.candidature import Candidature
 from app.models.offre import Offre
 from app.models.profiles import EntrepriseProfile, EtudiantProfile, FreelanceProfile
 from app.models.user import User
-from app.schemas.candidature import CandidatureCreate, CandidatureOut, CandidatureStatutUpdate
+from app.schemas.candidature import CandidatureCreate, CandidatureOut
 from app.schemas.matching import CandidatureAvecScore
 from app.services.matching import calculer_score_matching
 
@@ -122,13 +122,25 @@ def list_candidatures_for_offre(
 @router.get("/offre/{offre_id}/classees", response_model=list[CandidatureAvecScore])
 def list_candidatures_classees(
     offre_id: uuid.UUID,
+    score_min: float | None = None,
+    disponibilite: str | None = None,
+    statut: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Dashboard entreprise : candidats tries par score de compatibilite (cf. section 2.2)."""
+    """Dashboard entreprise : candidats tries par score de compatibilite (cf. section 2.2).
+
+    Filtres optionnels :
+    - score_min : n'affiche que les candidatures dont le score global est >= a cette valeur
+    - disponibilite : filtre exact sur la disponibilite declaree par le candidat
+       - statut : filtre exact sur le statut (recue, en_cours, entretien, refusee, acceptee)
+    """
     offre = _get_offre_owned_by_current_entreprise(offre_id, current_user, db)
 
-    candidatures = db.query(Candidature).filter(Candidature.offre_id == offre_id).all()
+    query = db.query(Candidature).filter(Candidature.offre_id == offre_id)
+    if statut:
+        query = query.filter(Candidature.statut == statut)
+    candidatures = query.all()
 
     resultats = []
     for candidature in candidatures:
@@ -139,19 +151,25 @@ def list_candidatures_classees(
                 db.query(EtudiantProfile).filter(EtudiantProfile.user_id == candidat.id).first()
             )
             competences = profile.competences if profile else None
-            disponibilite = profile.disponibilite if profile else None
+            candidat_disponibilite = profile.disponibilite if profile else None
             annees_experience = None
         else:
             profile = (
                 db.query(FreelanceProfile).filter(FreelanceProfile.user_id == candidat.id).first()
             )
             competences = profile.competences if profile else None
-            disponibilite = profile.disponibilite if profile else None
+            candidat_disponibilite = profile.disponibilite if profile else None
             annees_experience = profile.annees_experience if profile else None
+
+        if disponibilite and (
+            not candidat_disponibilite
+            or candidat_disponibilite.strip().lower() != disponibilite.strip().lower()
+        ):
+            continue
 
         matching = calculer_score_matching(
             candidat_competences=competences,
-            candidat_disponibilite=disponibilite,
+            candidat_disponibilite=candidat_disponibilite,
             candidat_annees_experience=annees_experience,
             offre_competences_obligatoires=offre.competences_obligatoires,
             offre_competences_souhaitees=offre.competences_souhaitees,
@@ -159,6 +177,9 @@ def list_candidatures_classees(
             offre_disponibilite=offre.disponibilite,
             offre_niveau_experience=offre.niveau_experience,
         )
+
+        if score_min is not None and matching["score_global"] < score_min:
+            continue
 
         resultats.append(
             CandidatureAvecScore(
@@ -171,24 +192,3 @@ def list_candidatures_classees(
 
     resultats.sort(key=lambda c: c.score_global, reverse=True)
     return resultats
-
-
-@router.patch("/{candidature_id}/statut", response_model=CandidatureOut)
-def update_candidature_statut(
-    candidature_id: uuid.UUID,
-    payload: CandidatureStatutUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    candidature = db.query(Candidature).filter(Candidature.id == candidature_id).first()
-    if candidature is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Candidature introuvable."
-        )
-
-    _get_offre_owned_by_current_entreprise(candidature.offre_id, current_user, db)
-
-    candidature.statut = payload.statut
-    db.commit()
-    db.refresh(candidature)
-    return candidature

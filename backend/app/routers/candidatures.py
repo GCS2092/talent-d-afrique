@@ -10,7 +10,7 @@ from app.models.candidature import Candidature
 from app.models.offre import Offre
 from app.models.profiles import EntrepriseProfile, EtudiantProfile, FreelanceProfile
 from app.models.user import User
-from app.schemas.candidature import CandidatureCreate, CandidatureOut
+from app.schemas.candidature import CandidatureCreate, CandidatureOut, CandidatureStatutUpdate
 from app.schemas.matching import CandidatureAvecScore
 from app.services.matching import calculer_score_matching
 
@@ -133,7 +133,7 @@ def list_candidatures_classees(
     Filtres optionnels :
     - score_min : n'affiche que les candidatures dont le score global est >= a cette valeur
     - disponibilite : filtre exact sur la disponibilite declaree par le candidat
-       - statut : filtre exact sur le statut (recue, en_cours, entretien, refusee, acceptee)
+    - statut : filtre exact sur le statut (recue, en_cours, entretien, refusee, acceptee)
     """
     offre = _get_offre_owned_by_current_entreprise(offre_id, current_user, db)
 
@@ -145,6 +145,7 @@ def list_candidatures_classees(
     resultats = []
     for candidature in candidatures:
         candidat = candidature.candidat
+        candidat_tjm = None
 
         if candidat.type_profil == "etudiant":
             profile = (
@@ -160,6 +161,7 @@ def list_candidatures_classees(
             competences = profile.competences if profile else None
             candidat_disponibilite = profile.disponibilite if profile else None
             annees_experience = profile.annees_experience if profile else None
+            candidat_tjm = profile.tjm if profile else None
 
         if disponibilite and (
             not candidat_disponibilite
@@ -171,11 +173,14 @@ def list_candidatures_classees(
             candidat_competences=competences,
             candidat_disponibilite=candidat_disponibilite,
             candidat_annees_experience=annees_experience,
+            candidat_tjm=candidat_tjm,
             offre_competences_obligatoires=offre.competences_obligatoires,
             offre_competences_souhaitees=offre.competences_souhaitees,
             offre_soft_skills=offre.soft_skills,
             offre_disponibilite=offre.disponibilite,
             offre_niveau_experience=offre.niveau_experience,
+            offre_type_contrat=offre.type_contrat,
+            offre_budget_tjm=offre.budget_tjm,
         )
 
         if score_min is not None and matching["score_global"] < score_min:
@@ -192,3 +197,24 @@ def list_candidatures_classees(
 
     resultats.sort(key=lambda c: c.score_global, reverse=True)
     return resultats
+
+
+@router.patch("/{candidature_id}/statut", response_model=CandidatureOut)
+def update_candidature_statut(
+    candidature_id: uuid.UUID,
+    payload: "CandidatureStatutUpdate",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    candidature = db.query(Candidature).filter(Candidature.id == candidature_id).first()
+    if candidature is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Candidature introuvable."
+        )
+
+    _get_offre_owned_by_current_entreprise(candidature.offre_id, current_user, db)
+
+    candidature.statut = payload.statut
+    db.commit()
+    db.refresh(candidature)
+    return candidature

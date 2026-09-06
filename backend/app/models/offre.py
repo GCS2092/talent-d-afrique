@@ -17,7 +17,7 @@ class Offre(Base):
     titre = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     type_contrat = Column(
-        Enum("stage", "cdd", "cdi", name="type_contrat"),
+        Enum("stage", "cdd", "cdi", "mission", name="type_contrat"),
         nullable=False,
     )
 
@@ -29,6 +29,9 @@ class Offre(Base):
     disponibilite = Column(String, nullable=True)
     localisation = Column(String, nullable=True)
     remuneration = Column(Float, nullable=True)
+    budget_tjm = Column(
+        Float, nullable=True
+    )  # taux journalier propose, pour les missions freelance
 
     statut = Column(
         Enum("active", "expiree", "archivee", name="statut_offre"),

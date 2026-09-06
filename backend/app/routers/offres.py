@@ -100,6 +100,8 @@ def list_offres_recommandees(
     db: Session = Depends(get_db),
 ):
     """Offres actives triees par score de compatibilite decroissant (cf. section 2.3)."""
+    candidat_tjm = None
+
     if current_user.type_profil == "etudiant":
         profile = (
             db.query(EtudiantProfile).filter(EtudiantProfile.user_id == current_user.id).first()
@@ -114,6 +116,7 @@ def list_offres_recommandees(
         candidat_competences = profile.competences if profile else None
         candidat_disponibilite = profile.disponibilite if profile else None
         candidat_annees_experience = profile.annees_experience if profile else None
+        candidat_tjm = profile.tjm if profile else None
     else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -128,11 +131,14 @@ def list_offres_recommandees(
             candidat_competences=candidat_competences,
             candidat_disponibilite=candidat_disponibilite,
             candidat_annees_experience=candidat_annees_experience,
+            candidat_tjm=candidat_tjm,
             offre_competences_obligatoires=offre.competences_obligatoires,
             offre_competences_souhaitees=offre.competences_souhaitees,
             offre_soft_skills=offre.soft_skills,
             offre_disponibilite=offre.disponibilite,
             offre_niveau_experience=offre.niveau_experience,
+            offre_type_contrat=offre.type_contrat,
+            offre_budget_tjm=offre.budget_tjm,
         )
         resultats.append(
             OffreAvecScore(

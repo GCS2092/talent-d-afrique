@@ -145,11 +145,14 @@ def suggestions_par_etudiant(
                 candidat_competences=etudiant.competences,
                 candidat_disponibilite=etudiant.disponibilite,
                 candidat_annees_experience=None,
+                candidat_tjm=None,
                 offre_competences_obligatoires=offre.competences_obligatoires,
                 offre_competences_souhaitees=offre.competences_souhaitees,
                 offre_soft_skills=offre.soft_skills,
                 offre_disponibilite=offre.disponibilite,
                 offre_niveau_experience=offre.niveau_experience,
+                offre_type_contrat=offre.type_contrat,
+                offre_budget_tjm=offre.budget_tjm,
             )
             if matching["recommandee"]:
                 scores_pour_etudiant.append(

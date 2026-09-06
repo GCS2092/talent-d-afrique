@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.database import engine  # noqa: F401
 from app.core.limiter import limiter
 from app.models import candidature, notification, offre, profiles, user  # noqa: F401
-from app.routers import auth, candidatures, cv, health, notifications, offres, users
+from app.routers import admin, auth, candidatures, cv, health, notifications, offres, users
 from app.routers import profiles as profiles_router
 
 app = FastAPI(
@@ -35,6 +35,7 @@ app.include_router(cv.router, prefix="/api/profiles", tags=["cv"])
 app.include_router(offres.router, prefix="/api/offres", tags=["offres"])
 app.include_router(candidatures.router, prefix="/api/candidatures", tags=["candidatures"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 
 @app.get("/")

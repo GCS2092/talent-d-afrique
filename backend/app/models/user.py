@@ -20,6 +20,7 @@ class User(Base):
         Enum("etudiant", "entreprise", "ecole", "freelance", name="type_profil"),
         nullable=False,
     )
+    is_admin = Column(Boolean, nullable=False, default=False)
 
     # RGPD (decisions section 6.1 du recap projet)
     consent_given_at = Column(DateTime, nullable=False, default=datetime.utcnow)

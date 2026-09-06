@@ -13,6 +13,7 @@ from app.models.user import User
 from app.schemas.candidature import CandidatureCreate, CandidatureOut, CandidatureStatutUpdate
 from app.schemas.matching import CandidatureAvecScore
 from app.services.matching import calculer_score_matching
+from app.services.notifications import notifier_changement_statut, notifier_nouvelle_candidature
 
 router = APIRouter()
 
@@ -85,6 +86,9 @@ def create_candidature(
         ) from exc
 
     db.refresh(candidature)
+
+    notifier_nouvelle_candidature(db, offre.entreprise.user, offre.titre)
+
     return candidature
 
 
@@ -202,7 +206,7 @@ def list_candidatures_classees(
 @router.patch("/{candidature_id}/statut", response_model=CandidatureOut)
 def update_candidature_statut(
     candidature_id: uuid.UUID,
-    payload: "CandidatureStatutUpdate",
+    payload: CandidatureStatutUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -217,4 +221,7 @@ def update_candidature_statut(
     candidature.statut = payload.statut
     db.commit()
     db.refresh(candidature)
+
+    notifier_changement_statut(db, candidature.candidat, candidature.offre.titre, payload.statut)
+
     return candidature

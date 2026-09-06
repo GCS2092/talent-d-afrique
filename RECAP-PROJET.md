@@ -1,218 +1,251 @@
-# TALENT D'AFRIQUE — Récapitulatif de l'installation
+# TALENT D'AFRIQUE — Récapitulatif spécial BACKEND
 
-*Dernière mise à jour : ce qui a été fait jusqu'ici, avant d'attaquer le développement du socle (inscription/connexion).*
-
----
-
-## 1. Structure du projet
-
-```
-talent-afrique/
-├── backend/     → API (Python + FastAPI)
-└── frontend/    → Interface web (React + Vite)
-```
-
-Deux dossiers séparés mais qui travailleront ensemble : le frontend affiche les pages et parle à l'API du backend, qui elle-même parle à la base de données.
+*Ce document liste chaque fichier du backend, à quoi il sert, et ce qu'il reste à faire. Objectif : te repérer immédiatement à la reprise, sans avoir à relire tout le code.*
 
 ---
 
-## 2. Backend — ce qui est installé et pourquoi
+## 1. Où en est le backend
 
-Le backend est l'endroit où vit toute la logique du produit : comptes utilisateurs, offres, candidatures, moteur de matching, etc. Le frontend ne fait qu'afficher ce que le backend lui envoie.
+Le socle d'authentification complet est **terminé, testé et validé** : inscription, connexion, gestion de compte (modification, export RGPD, suppression), protection anti-bruteforce, migrations gérées par Alembic.
 
-| Dépendance | À quoi ça sert dans le projet |
-|---|---|
-| **fastapi** | Le framework qui fait tourner l'API — c'est lui qui reçoit les requêtes du frontend (« crée ce compte », « donne-moi les offres ») et renvoie les réponses. |
-| **uvicorn** | Le serveur qui fait réellement tourner FastAPI (sans lui, FastAPI n'est que du code, pas un service accessible). |
-| **python-multipart** | Nécessaire pour recevoir des fichiers envoyés depuis le frontend, typiquement le CV en PDF uploadé par un étudiant. |
-| **sqlalchemy** | Fait le lien entre le code Python et la base de données : permet de manipuler des « comptes », « offres », « candidatures » comme des objets Python plutôt que d'écrire du SQL brut. |
-| **psycopg2-binary** | Le connecteur technique qui permet à SQLAlchemy de parler concrètement à PostgreSQL. |
-| **alembic** | Gère l'évolution de la base de données dans le temps (ex : le jour où on ajoute un champ « TJM » pour les freelances, alembic sait comment modifier une base déjà en production sans perdre les données existantes). |
-| **pgvector** | Prépare le terrain pour le matching V2 (sémantique) : permet à PostgreSQL de stocker et comparer des « embeddings » (représentations mathématiques du sens d'un texte), sans avoir besoin d'une base de données séparée. |
-| **python-jose** | Génère et vérifie les tokens de connexion (JWT) — c'est ce qui permet à un utilisateur de rester connecté sans retaper son mot de passe à chaque page. |
-| **passlib** + **bcrypt** | Chiffre les mots de passe avant de les stocker en base. Un mot de passe n'est jamais enregistré en clair. |
-| **python-dotenv** | Permet de garder les informations sensibles (mots de passe de la base de données, clés API) dans un fichier `.env` séparé du code, jamais partagé publiquement. |
-| **pydantic** + **pydantic-settings** | Vérifie automatiquement que les données reçues sont valides (ex : qu'un email a bien la forme d'un email, qu'un champ obligatoire n'est pas vide) avant de les traiter. |
-| **email-validator** | Complète pydantic spécifiquement pour valider le format des adresses email. |
-| **pdfplumber** | Lit le contenu texte d'un CV au format PDF, pour en extraire les informations (compétences, expériences...). |
-| **spacy** (+ modèle français `fr_core_news_md`) | Analyse le texte extrait du CV pour repérer les noms, compétences, dates, etc. — c'est le moteur qui permet de pré-remplir automatiquement le profil d'un étudiant à partir de son CV. |
-| **pytesseract** | Fait de la reconnaissance de texte sur des images (OCR) — utile quand un CV est un PDF scanné (une image) plutôt qu'un vrai texte. |
-| **pillow** | Bibliothèque de traitement d'image, nécessaire au fonctionnement de pytesseract. |
-| **pdf2image** | Convertit les pages d'un PDF en images, étape nécessaire avant de faire de l'OCR dessus. |
-| **resend** | Service d'envoi d'emails (confirmation d'inscription, notification de nouvelle candidature, etc.). |
-| **redis** | Client pour un système de cache/sessions rapide — utile plus tard pour accélérer certaines opérations répétitives. |
-| **pytest**, **httpx**, **pytest-asyncio** | Outils pour écrire des tests automatisés qui vérifient que le code fonctionne correctement avant chaque mise en production. |
+**Huit étapes du cahier des charges sont maintenant complètes et testées :**
+1. ✅ Socle (inscription, connexion, gestion de compte)
+2. ✅ Profils complets par type d'utilisateur + parsing automatique de CV
+3. ✅ CRUD des offres d'emploi avec contrôle de propriété
+4. ✅ Dépôt de candidature et suivi de statut, des deux côtés (candidat et entreprise)
+5. ✅ Moteur de matching V1 (scoring pondéré), avec transparence du détail par critère
+6. ✅ Dashboard entreprise avec filtres (score minimum, disponibilité, statut) sur les candidats classés
+7. ✅ Espace école : rattachement d'étudiants, suggestions d'offres par étudiant, statistiques d'employabilité
+8. ✅ Espace freelance : type de contrat "mission", budget TJM sur les offres, matching adapté (comparaison TJM candidat/budget plutôt qu'expérience classique)
 
-### Outils système installés (en dehors de Python)
-
-| Outil | À quoi ça sert |
-|---|---|
-| **Tesseract OCR** | Le moteur de reconnaissance de texte utilisé par `pytesseract` — sans lui installé sur la machine, la bibliothèque Python ne peut rien faire. |
-| **Poppler** | Fournit les outils de conversion PDF → image utilisés par `pdf2image`. Installé manuellement via les binaires précompilés (pas via Chocolatey, qui ne fournissait que le code source à compiler). |
+Prochaine étape : l'étape 9 du cahier des charges — les notifications (in-app et email) sur les événements clés (nouvelle offre matchée, candidature reçue, changement de statut).
 
 ---
 
-## 3. Frontend — ce qui est installé et pourquoi
+## 2. Chaque fichier, un par un
 
-Le frontend est ce que voient et utilisent réellement les étudiants, entreprises, écoles et freelances : les pages, les formulaires, les boutons.
+### `app/main.py`
+**Rôle** : le chef d'orchestre. C'est le fichier qui démarre l'application, connecte tous les morceaux entre eux (CORS, routes, base de données) et qu'on lance avec `uvicorn`.
+**Pourquoi il est important** : c'est le seul fichier qu'on exécute directement. Si une route existe dans un autre fichier mais n'est pas "branchée" ici via `include_router`, elle n'existera pas pour de vrai.
+**État** : à jour, inclut désormais 3 groupes de routes (health, auth, users) et le système anti-spam (rate limiting).
 
-| Dépendance | À quoi ça sert dans le projet |
-|---|---|
-| **React** (+ Vite) | Le framework qui construit l'interface. Vite est l'outil qui fait tourner le projet en développement et prépare la version finale pour la mise en ligne. Choisi notamment car réutilisable plus tard pour la version mobile (React Native). |
-| **TypeScript** | Ajoute une vérification des types au JavaScript, ce qui limite les erreurs bêtes (ex : envoyer un texte là où un nombre est attendu) avant même de tester dans le navigateur. |
-| **vite-plugin-pwa** | Rend l'application installable sur l'écran d'accueil d'un téléphone ou ordinateur, et permet un fonctionnement partiel hors connexion — un des points clés du cahier des charges (section 3). |
-| **react-router-dom** | Gère la navigation entre les différentes pages (accueil, inscription, connexion, dashboard entreprise, etc.) sans recharger complètement le site à chaque clic. |
-| **@tanstack/react-query** | Gère les échanges de données avec le backend (récupérer les offres, envoyer une candidature) de façon optimisée : mémorise les résultats, évite les requêtes inutiles, gère les états de chargement/erreur automatiquement. |
-| **axios** | Bibliothèque qui envoie concrètement les requêtes HTTP vers l'API du backend. |
-| **react-hook-form** | Gère les formulaires (inscription, création d'offre, etc.) de façon performante et avec moins de code répétitif. |
-| **zod** | Définit des règles de validation (ex : « le mot de passe doit faire au moins 8 caractères ») et vérifie que les données du formulaire les respectent avant envoi. |
-| **@hookform/resolvers** | Fait le lien entre `react-hook-form` et `zod`, pour que les deux fonctionnent ensemble. |
-| **Tailwind CSS v4** | Système de style qui permet d'habiller les pages rapidement via des classes CSS prêtes à l'emploi, plutôt que d'écrire du CSS personnalisé pour chaque élément. Installé en v4 (méthode 2026 : plugin Vite direct, sans fichiers de config séparés comme avant). |
-| **react-email** + **@react-email/components** | Permet de construire les templates d'emails (confirmation d'inscription, notification) avec des composants React plutôt qu'en HTML brut. *Note : ces paquets sont signalés comme n'étant plus activement maintenus par leurs auteurs — à surveiller, un remplacement pourra être envisagé si besoin plus tard.* |
+### `app/core/config.py`
+**Rôle** : le tableau de bord des réglages. Centralise toutes les valeurs qui changent selon l'environnement (mot de passe de la base, durée de vie des sessions, adresse du frontend...).
+**Pourquoi il est important** : évite d'avoir des valeurs codées en dur éparpillées dans 10 fichiers différents. Un seul endroit à modifier.
+**État** : à jour, inclut maintenant la durée du "refresh token" (voir plus bas).
+
+### `app/core/database.py`
+**Rôle** : établit la connexion technique à la base de données PostgreSQL.
+**Pourquoi il est important** : sans lui, aucun fichier ne peut lire ou écrire dans la base.
+**État** : fonctionnel, connecté à la base locale créée via pgAdmin4.
+
+### `app/core/security.py`
+**Rôle** : la boîte à outils de sécurité. Contient les fonctions qui chiffrent les mots de passe et qui créent/vérifient les "tickets d'entrée" numériques (tokens) qui prouvent qu'un utilisateur est bien connecté.
+**Pourquoi il est important** : c'est le cœur de la sécurité de toute la plateforme. Une faille ici mettrait en danger tous les comptes.
+**État** : fonctionnel. Utilise la librairie `bcrypt` directement (pas `passlib`, abandonnée car buggée avec les versions récentes — voir section 4). Gère maintenant deux types de tickets : un ticket court ("access token", 30 minutes) et un ticket long ("refresh token", 7 jours) qui permet de renouveler le premier sans redemander le mot de passe.
+
+### `app/core/deps.py`
+**Rôle** : le videur à l'entrée des routes protégées. Vérifie, à chaque requête sur une route sensible, que la personne a bien un ticket d'entrée valide, et va chercher qui elle est dans la base.
+**Pourquoi il est important** : sans ce fichier, il faudrait réécrire la même vérification de sécurité dans chaque route une par une, avec un risque d'oubli.
+**État** : nouveau ce tour-ci, fonctionnel.
+
+### `app/core/limiter.py`
+**Rôle** : le videur qui compte les tentatives. Limite le nombre de fois qu'une même personne peut essayer de se connecter ou de créer un compte en peu de temps.
+**Pourquoi il est important** : bloque les attaques automatisées qui testent des milliers de mots de passe à la suite.
+**État** : nouveau ce tour-ci. Fonctionne en mémoire pour l'instant (suffisant en développement) ; devra migrer vers Upstash Redis avant la mise en production (prévu dans le cahier des charges, section 5.1) pour fonctionner correctement si plusieurs serveurs tournent en même temps.
+
+### `app/models/user.py`
+**Rôle** : le plan de construction de la table "utilisateurs" dans la base de données. Décrit quelles informations sont stockées pour chaque compte.
+**Pourquoi il est important** : c'est la source de vérité de ce qu'est "un utilisateur" pour toute l'application.
+**État** : fonctionnel, inclut les champs RGPD décidés en amont (date de consentement, version des CGU acceptée, date de suppression pour la suppression différée).
+
+### `app/schemas/user.py`
+**Rôle** : le videur à l'entrée et à la sortie de l'API. Vérifie que les données envoyées par le frontend ont la bonne forme (un email est bien un email, un mot de passe fait au moins 8 caractères...) et définit précisément ce que l'API renvoie (jamais le mot de passe, par exemple).
+**Pourquoi il est important** : évite d'enregistrer des données invalides en base, et évite de fuiter accidentellement des informations sensibles dans les réponses.
+**État** : étendu ce tour-ci avec les formats pour la modification de profil et les tickets de renouvellement.
+
+### `app/routers/health.py`
+**Rôle** : une route toute simple qui répond "je fonctionne" — sert à vérifier rapidement que le serveur est en vie.
+**État** : inchangé depuis le début, toujours utile pour les tests rapides.
+
+### `app/routers/auth.py`
+**Rôle** : regroupe toutes les routes liées à l'identité : créer un compte, se connecter, renouveler son ticket d'accès, consulter qui on est.
+**Pourquoi il est important** : c'est la porte d'entrée de toute la plateforme.
+**État** : complet pour le socle. Contient désormais 4 routes : inscription, connexion, renouvellement de session, et consultation de son propre profil.
+
+### `app/routers/users.py`
+**Rôle** : regroupe les routes de gestion de son propre compte une fois connecté : modifier ses informations, exporter ses données, supprimer son compte.
+**Pourquoi il est important** : c'est la mise en œuvre concrète des droits RGPD décidés en amont (droit de rectification, d'export, à l'oubli).
+**État** : nouveau ce tour-ci, fonctionnel. La suppression est "logique" (le compte est désactivé, pas effacé immédiatement) — la purge définitive après 30 jours n'est pas encore automatisée (voir section 3).
+
+### `requirements.txt`
+**Rôle** : la liste de courses de toutes les librairies Python nécessaires au projet.
+**Pourquoi il est important** : permet à n'importe qui (ou à toi sur une autre machine) de tout réinstaller à l'identique avec une seule commande.
+**État** : à jour, inclut désormais `slowapi` (rate limiting) ; ne contient plus `passlib` (retirée).
+
+### `pyproject.toml`
+**Rôle** : la feuille de règles de qualité de code (Ruff), qui repère automatiquement les erreurs de style ou les oublis avant qu'ils posent problème.
+**État** : à jour. Une règle (`B008`) a dû être désactivée volontairement, car elle signalait à tort une pratique qui est en réalité normale et recommandée avec FastAPI.
+
+### `app/core/types.py`
+**Rôle** : contient un type de donnée technique réutilisable (`GUID`) qui permet d'utiliser des identifiants uniques (UUID) de façon compatible avec PostgreSQL comme avec d'autres bases de données.
+**Pourquoi il est important** : évite de dupliquer ce code technique dans chaque fichier de modèle qui en a besoin — extrait ici une fois que 5 modèles différents (utilisateur + 4 profils) s'en servent.
+**État** : nouveau ce tour-ci, fonctionnel.
+
+### `app/models/profiles.py`
+**Rôle** : le plan de construction de 4 tables distinctes — une par type de profil (`EntrepriseProfile`, `EtudiantProfile`, `EcoleProfile`, `FreelanceProfile`) — chacune avec les informations propres à ce type d'utilisateur (secteur et logo pour une entreprise, compétences et CV pour un étudiant, TJM pour un freelance...).
+**Pourquoi il est important** : c'est la mise en œuvre concrète de la section 2 du cahier des charges (besoins fonctionnels par persona). Un étudiant est aussi lié à une école via `ecole_id`, ce qui permettra plus tard à une école de retrouver "ses" étudiants.
+**État** : nouveau ce tour-ci, fonctionnel et testé pour le profil étudiant.
+
+### `app/schemas/profiles.py`
+**Rôle** : définit les formats de données valides pour chacun des 4 profils, à l'entrée comme à la sortie de l'API.
+**État** : nouveau ce tour-ci, fonctionnel.
+
+### `app/routers/profiles.py`
+**Rôle** : les routes qui permettent à un utilisateur connecté de consulter et modifier son propre profil, quel que soit son type — une seule route s'adapte automatiquement selon si c'est un étudiant, une entreprise, une école ou un freelance. Contient aussi une route dédiée pour qu'une école consulte la liste de ses étudiants.
+**Pourquoi il est important** : simplifie le travail du frontend, qui n'a pas besoin de connaître 4 routes différentes selon le profil — une seule suffit.
+**État** : nouveau ce tour-ci, fonctionnel et testé (création, consultation, gestion des cas où le profil n'existe pas encore).
+
+### `app/core/skills_dictionary.py`
+**Rôle** : une liste manuelle de compétences connues (Python, React, SQL...) et de leurs différentes façons d'être écrites (synonymes, abréviations). Sert à repérer ces compétences dans un texte brut.
+**Pourquoi il est important** : c'est la mise en œuvre concrète de la décision prise en amont (section 6.6 du récap projet) pour gérer les synonymes en V1, avant l'arrivée du moteur sémantique plus avancé prévu en V2.
+**État** : nouveau ce tour-ci, fonctionnel. Volontairement limité à une quinzaine de compétences pour démarrer — à enrichir progressivement.
+
+### `app/services/cv_parser.py`
+**Rôle** : le cœur du parsing de CV. Ouvre un fichier PDF, en extrait le texte ; si le PDF est en réalité une image scannée (peu de texte détecté), bascule automatiquement sur la reconnaissance optique de caractères (OCR) pour quand même récupérer le contenu. Une fois le texte obtenu, détecte les compétences qu'il contient.
+**Pourquoi il est important** : c'est la fonctionnalité "pré-remplissage automatique du profil" prévue dans le cahier des charges (section 2.3), pour éviter à un étudiant de tout ressaisir à la main.
+**État** : nouveau ce tour-ci, fonctionnel et testé avec succès.
+
+### `app/routers/cv.py`
+**Rôle** : la route qui reçoit un fichier PDF envoyé par un étudiant, vérifie qu'il s'agit bien d'un étudiant et d'un vrai PDF (pas trop volumineux), sauvegarde le fichier, l'analyse, puis met à jour le profil avec les compétences trouvées — sans effacer celles déjà renseignées à la main.
+**Pourquoi il est important** : relie le service d'analyse (`cv_parser.py`) au reste de l'application de façon sécurisée (seul le propriétaire du profil peut déposer son propre CV).
+**État** : nouveau ce tour-ci, fonctionnel et testé de bout en bout en ligne de commande.
+
+### `app/models/offre.py`
+**Rôle** : le plan de construction de la table "offres". Décrit tout ce qu'une offre d'emploi contient : titre, description, type de contrat (stage/CDD/CDI), compétences obligatoires et souhaitées séparément, soft skills, niveau d'expérience, disponibilité, localisation, rémunération, et un statut (active/expirée/archivée).
+**Pourquoi il est important** : structure directement héritée de la section 2.2 du cahier des charges. La séparation entre compétences "obligatoires" et "souhaitées" est essentielle : c'est elle qui permettra au futur moteur de matching (étape 5) de pondérer différemment ces deux catégories.
+**État** : nouveau ce tour-ci, fonctionnel et testé.
+
+### `app/schemas/offre.py`
+**Rôle** : définit les formats valides pour créer, modifier et afficher une offre.
+**État** : nouveau ce tour-ci, fonctionnel.
+
+### `app/routers/offres.py`
+**Rôle** : toutes les routes liées aux offres — création, liste publique (visible par tous, filtrée sur les offres actives par défaut), liste privée ("mes offres" pour une entreprise, incluant les archivées), consultation d'une offre précise, modification, suppression.
+**Pourquoi il est important** : contient une vérification systématique qu'une entreprise ne peut modifier ou supprimer que **ses propres offres** — un point de sécurité qu'on avait identifié comme manquant dans une précédente version du récap.
+**État** : nouveau ce tour-ci, fonctionnel et testé de bout en bout (création, listes, modification de statut, filtrage).
+
+### `app/models/candidature.py`
+**Rôle** : le plan de construction de la table "candidatures" — relie un candidat (étudiant ou freelance) à une offre, avec un message optionnel et un statut (reçue, en cours, entretien, refusée, acceptée).
+**Pourquoi il est important** : contient une contrainte technique qui empêche, au niveau même de la base de données, qu'un même candidat postule deux fois à la même offre — plus robuste qu'une simple vérification dans le code.
+**État** : nouveau ce tour-ci, fonctionnel et testé.
+
+### `app/schemas/candidature.py`
+**Rôle** : définit les formats valides pour déposer une candidature et changer son statut.
+**État** : nouveau ce tour-ci, fonctionnel.
+
+### `app/routers/candidatures.py`
+**Rôle** : les routes de candidature — déposer une candidature (réservé aux étudiants et freelances, uniquement sur une offre active), suivre ses propres candidatures, consulter les candidatures reçues pour une offre (réservé à l'entreprise propriétaire), classer les candidatures par score de compatibilité, changer le statut d'une candidature.
+**Pourquoi il est important** : c'est la mise en œuvre de la mise en relation candidat/entreprise, avec des contrôles de sécurité stricts (une entreprise ne peut voir ou modifier que les candidatures liées à ses propres offres).
+**État** : fonctionnel et testé de bout en bout (dépôt, rejet des doublons, suivi de statut visible des deux côtés, classement par score).
+
+### `app/core/matching_config.py`
+**Rôle** : un seul petit fichier qui contient tous les réglages du moteur de matching — le poids de chaque critère (compétences obligatoires, souhaitées, expérience, disponibilité, soft skills) et le seuil en dessous duquel une offre n'est pas mise en avant.
+**Pourquoi il est important** : centralise la décision prise en amont (section 6.6 du récap projet) dans un seul endroit modifiable, sans avoir à toucher au code de calcul si les pourcentages doivent changer suite aux retours utilisateurs.
+**État** : nouveau ce tour-ci, fonctionnel.
+
+### `app/services/matching.py`
+**Rôle** : le cœur du moteur de matching V1. Compare les compétences, la disponibilité et l'expérience d'un candidat à ce que demande une offre, calcule un score global sur 100 ainsi qu'un détail par critère (pour la transparence demandée en section 3 du cahier des charges — "pourquoi ce score"), et détermine si l'offre doit être mise en avant ou non.
+**Pourquoi il est important** : c'est la fonctionnalité présentée dans le cahier des charges comme "la colonne vertébrale du produit" (section 4). Réutilise le dictionnaire de synonymes de compétences déjà existant.
+**État** : nouveau ce tour-ci, fonctionnel et testé avec des scores cohérents (validé avec un cas à 100% de correspondance et un cas à 0%).
+
+### `app/schemas/matching.py`
+**Rôle** : étend les schémas d'offre et de candidature existants pour y ajouter les informations de score, sans dupliquer tous leurs champs.
+**État** : nouveau ce tour-ci, fonctionnel.
+
+### `scripts/test-matching.ps1`
+**Rôle** : un script qui automatise entièrement le test du moteur de matching — connexion des deux comptes de test, création d'une offre propre, dépôt d'une candidature, affichage des scores des deux points de vue (candidat et entreprise).
+**Pourquoi il est important** : évite de redéfinir manuellement une offre de test à chaque fois dans Swagger (risque d'oublier de remplir les champs, comme cela a été le cas une fois avec une offre restée à ses valeurs d'exemple "string"). Rejouable à l'identique après chaque modification du moteur de matching.
+**État** : nouveau ce tour-ci, fonctionnel et validé.
+
+### `scripts/test-filtres.ps1`
+**Rôle** : un script qui teste automatiquement les 3 filtres du dashboard entreprise (score minimum, disponibilité, statut), avec un résultat "OK" ou "INATTENDU" affiché pour chaque cas — pas besoin de comparer les résultats à la main.
+**Pourquoi il est important** : les filtres combinent plusieurs cas limites (aucun résultat attendu, un résultat attendu) qu'il serait fastidieux et sujet à erreur de vérifier manuellement dans Swagger à chaque modification du code.
+**État** : fonctionnel et validé (6 tests, tous "OK").
+
+### `app/routers/profiles.py` (routes ajoutées à ce tour-ci)
+**Rôle** : trois nouvelles routes sont venues compléter ce fichier — permettre à un étudiant de se rattacher à une école existante, générer pour une école des suggestions d'offres pour chacun de ses étudiants (top 5 par étudiant, en réutilisant directement le moteur de matching), et calculer des statistiques simples d'employabilité de la promotion (nombre de candidatures envoyées/acceptées, taux de placement).
+**Pourquoi c'est important** : c'est la mise en œuvre concrète de la section 2.4 du cahier des charges. Les suggestions et statistiques ne créent aucune nouvelle donnée — elles recalculent tout à la volée à partir des tables déjà existantes (profils, offres, candidatures), donc aucune migration n'a été nécessaire pour cette étape.
+**État** : fonctionnel et testé de bout en bout (rattachement, liste, suggestions cohérentes avec le moteur de matching, statistiques exactes).
+
+### `scripts/test-ecole.ps1`
+**Rôle** : automatise tout le scénario de l'espace école — création du compte, connexion, création du profil, rattachement d'un étudiant existant, consultation de la liste, des suggestions et des statistiques.
+**État** : fonctionnel et validé.
+
+### Étape 8 — Espace freelance et matching adapté
+
+**Modification du modèle `Offre`** : le type de contrat accepte désormais une quatrième valeur, `mission`, en plus de stage/CDD/CDI. Un nouveau champ `budget_tjm` (taux journalier maximum que l'entreprise est prête à payer) a été ajouté.
+**Pourquoi c'est important** : c'est la traduction concrète de la demande du cahier des charges (section 2.5) d'avoir des "critères adaptés, différents du CDI/CDD" pour les freelances — le concept d'expérience en années n'a pas vraiment de sens pour une mission ponctuelle, le budget si.
+
+**Modification du moteur de matching (`app/services/matching.py`)** : une nouvelle fonction `_score_tjm` compare le TJM déclaré par le freelance au budget de la mission (score maximal si le TJM rentre dans le budget, pénalité proportionnelle au-delà). Le critère "expérience" de la pondération générale (toujours 20% du score, décision section 6.6 du récap) utilise maintenant soit `_score_tjm` (si l'offre est une mission), soit l'ancien `_score_experience` (pour stage/CDD/CDI) — sans avoir eu besoin de créer une pondération séparée.
+**État** : fonctionnel et testé — un freelance à 150 de TJM obtient un score d'expérience de 100 sur une mission à 200 de budget, et de 12.5 sur une mission à 80 de budget (dépassement pénalisé proportionnellement).
+
+**Point de vigilance rencontré et résolu** : ajouter une valeur à un `Enum` PostgreSQL déjà existant (`type_contrat`) n'est **jamais détecté automatiquement** par `alembic revision --autogenerate` — seul l'ajout de colonne (`budget_tjm`) a été détecté. La ligne `op.execute("ALTER TYPE type_contrat ADD VALUE IF NOT EXISTS 'mission'")` a dû être ajoutée manuellement dans le fichier de migration. À refaire de la même façon pour toute future modification d'un enum existant (ajouter une valeur à `statut_offre` ou `statut_candidature`, par exemple).
+
+### `scripts/test-freelance.ps1`
+**Rôle** : automatise le test complet de l'espace freelance — création du compte, profil avec TJM, création de deux missions (une dans le budget, une hors budget), vérification que le score de matching reflète bien cette différence.
+**État** : nouveau ce tour-ci, fonctionnel et validé.
+**Rôle** : la configuration du système de migrations. Décrit comment Alembic doit se connecter à la base et où trouver la description des tables (`Base.metadata`).
+**Pourquoi il est important** : c'est ce qui permet de faire évoluer la structure de la base de données (ajouter une colonne, une table) de façon tracée et réversible, plutôt que de modifier la base à la main ou de tout recréer à chaque redémarrage.
+**État** : nouveau ce tour-ci, fonctionnel. Configuré pour lire `DATABASE_URL` depuis le `.env` (pas de mot de passe en dur dans un fichier versionné).
+
+### `alembic/versions/xxxx_creation_table_users.py`
+**Rôle** : la toute première "photo" de la structure de la base — décrit comment créer la table `users` depuis une base vide.
+**Pourquoi il est important** : chaque futur changement de structure (nouvelle table, nouvelle colonne) donnera lieu à un nouveau fichier de ce type, formant un historique complet et applicable pas à pas.
+**État** : générée et appliquée avec succès.
 
 ---
 
-## 4. Ce qui a été mis en place concrètement
+## 3. Ce qui reste à faire côté backend (dans l'ordre de priorité)
 
-- Le projet backend et frontend sont initialisés dans deux dossiers séparés.
-- Toutes les dépendances ci-dessus sont installées et fonctionnelles.
-- Tesseract et Poppler (OCR et traitement PDF) sont installés et vérifiés en ligne de commande.
-- Une première page d'accueil fonctionne en local (`http://localhost:5173`), avec :
-  - la charte graphique bleu / orange / blanc du cahier des charges,
-  - le sélecteur des 4 types de profils (étudiant, entreprise, école, freelance),
-  - une mise en page réalisée entièrement avec Tailwind CSS.
+### Avant la mise en production (pas urgent maintenant, mais à ne pas oublier)
+- **Le "refresh token" ne peut pas être invalidé avant son expiration naturelle.** Actuellement, si un utilisateur perd son appareil, son ticket de renouvellement reste valable jusqu'à 7 jours. Une vraie solution nécessiterait de garder une trace des tickets valides quelque part (Redis), pas urgent pour du développement mais important avant l'ouverture au public.
+- **La création automatique des tables au démarrage a été retirée** — c'est maintenant Alembic qui gère la structure de la base, une méthode fiable pour la production. ✅ Réglé.
+- **La suppression de compte n'efface pas réellement les données après 30 jours** — il faudra une tâche automatique qui tourne régulièrement pour faire cette purge, ce qui n'existe pas encore.
+- **Le système anti-spam (rate limiting) ne fonctionne correctement que sur un seul serveur.** S'il y a plusieurs serveurs en production, il faudra le brancher sur Upstash Redis pour que la limite soit partagée entre eux.
 
-## 5. Ce qu'il reste à faire (prochaines étapes)
-
-D'après l'ordre de réalisation du cahier des charges (section 7), la suite logique est :
-
-1. **Le socle** : pages d'inscription et de connexion réelles, connectées au backend, avec choix du type de profil sauvegardé en base de données.
-2. **Le routing frontend** : de vraies pages séparées (`/inscription`, `/connexion`, etc.) au lieu d'une page unique.
-3. **La première route API** côté backend, avec connexion effective à la base de données PostgreSQL.
+### Pour avancer dans le cahier des charges (étape 9 et suivantes)
+- **L'étape 8 est maintenant complète** (espace freelance et matching adapté par TJM, testé de bout en bout). ✅
+- **Aucune notification (in-app ou email) n'existe encore** — c'est le prochain chantier (étape 9). Resend est installé depuis le début du projet mais aucune route ne l'utilise encore. Il faudra décider quels événements déclenchent une notification (nouvelle candidature reçue, changement de statut, nouvelle offre correspondant au profil d'un candidat) et où stocker les notifications in-app (nouvelle table à créer).
+- Le score d'expérience/TJM reste une heuristique simple. Le cahier des charges prévoit d'affiner cela avec du NLP en V2 — pas un défaut à corriger maintenant, une limite connue et assumée de la V1.
+- Le stockage des CV est actuellement **local** (dossier `storage/` sur la machine de développement, exclu de Git). À migrer vers Supabase Storage avant la mise en production (prévu dans le cahier des charges, section 5.1).
+- Les données de test se sont accumulées en base au fil des scripts (plusieurs offres nommées "Mission React...", "Developpeur Full-Stack..."). Sans danger, mais un nettoyage (`DELETE FROM offres WHERE ...`) peut être fait à tout moment si la base de test devient difficile à lire dans pgAdmin4.
 
 ---
 
-## 6. Décisions prises pour trancher les points ouverts (section 8 du cahier des charges)
 
-Tous les points laissés en suspens dans le cahier des charges initial ont été tranchés avant d'attaquer le développement du socle (inscription/connexion), pour éviter de devoir revenir en arrière sur des choix structurants une fois le code écrit.
+## 4. Petits pièges rencontrés, pour ne pas retomber dedans
 
-### 6.1 Sécurité et RGPD
-
-| Sujet | Décision | Pourquoi |
-|---|---|---|
-| Mots de passe | Chiffrés avec bcrypt (déjà en place) | Standard fiable, impossible à retrouver en clair même en cas de fuite de la base |
-| Connexion | Un jeton de connexion (JWT) valable 15-30 minutes, renouvelé automatiquement pendant 7 jours | Si un jeton est volé, il devient inutilisable rapidement |
-| Consentement RGPD | Chaque compte enregistre la date et la version des CGU acceptées à l'inscription | Permet de prouver légalement que la personne a bien consenti, et à quel texte exactement |
-| Suppression de compte | Le compte est d'abord masqué (« supprimé » aux yeux de l'utilisateur), puis réellement effacé de la base au bout de 30 jours | Évite qu'une suppression accidentelle ou un piratage de compte soit irréversible immédiatement, tout en respectant le droit à l'oubli |
-| Export des données | Chaque utilisateur pourra demander une copie de toutes ses données dès la mise en place du socle | Obligation légale RGPD, plus simple à prévoir dès le début qu'à ajouter plus tard sur une base de données qui aura grossi |
-| Protection contre le piratage de mots de passe | Limitation du nombre de tentatives de connexion par minute (via Redis, déjà installé) | Empêche un pirate de tester des milliers de mots de passe automatiquement |
-
-### 6.2 Environnements et secrets
-
-Trois environnements séparés et cloisonnés : développement local (sur la machine), pré-production (tests avant mise en ligne), production (le vrai site). Chacun a ses propres mots de passe et clés — jamais les mêmes d'un environnement à l'autre. Les vrais secrets de production ne seront jamais écrits dans le code, uniquement configurés directement chez l'hébergeur (Render, Vercel).
-
-### 6.3 Qualité de code
-
-| Outil | À quoi il sert |
-|---|---|
-| **Ruff** (à installer côté backend) | Relit automatiquement le code Python pour repérer les erreurs de style et les problèmes évidents avant qu'ils posent souci |
-| **ESLint** (déjà installé côté frontend) | Fait la même chose côté React/TypeScript |
-| **pre-commit** (à mettre en place) | Empêche d'enregistrer du code dans Git s'il ne respecte pas les règles ci-dessus |
-| **pytest** (déjà installé) | Vérifie automatiquement que les fonctionnalités critiques (connexion, matching) fonctionnent toujours après chaque modification |
-
-### 6.4 Suivi des erreurs en production
-
-**Sentry** sera branché au moment de la mise en ligne : il alerte automatiquement en cas de bug réel chez un utilisateur, plutôt que de découvrir les problèmes par les plaintes.
-
-### 6.5 Sauvegardes de la base de données
-
-Supabase (prévu pour la production) effectue des sauvegardes automatiques sur son offre gratuite, mais avec une durée de conservation limitée — point à vérifier précisément au moment du déploiement, et à surveiller.
-
-### 6.6 Pondération du moteur de matching V1
-
-Pour éviter de rester bloqué sur une IA « floue », la formule suivante a été retenue comme point de départ (ajustable après les premiers retours utilisateurs) :
-
-- Compétences obligatoires : **40 %**
-- Compétences souhaitées : **20 %**
-- Expérience : **20 %**
-- Disponibilité : **10 %**
-- Soft skills : **10 %**
-
-Une offre avec un score inférieur à **40 %** ne sera pas mise en avant dans les recommandations du candidat (mais reste consultable s'il cherche activement).
-
-Pour la gestion des synonymes de compétences (ex : « JS » = « JavaScript ») en attendant le moteur sémantique de la V2, on utilisera un simple dictionnaire de correspondances tenu à la main — suffisant pour démarrer, sans complexité inutile.
-
-### 6.7 Mode hors ligne (PWA)
-
-Périmètre retenu pour la V1 : les données déjà consultées (profil, dernières offres vues) restent lisibles sans connexion. En revanche, aucune action (postuler, envoyer un message) ne sera possible hors ligne dans cette première version — trop complexe à synchroniser correctement pour l'instant, cette fonctionnalité est repoussée à une version ultérieure.
-
-### 6.8 Charte graphique
-
-- Bleu principal : `#1D4ED8`
-- Orange d'accent (boutons d'action) : `#F97316`
-- Gris neutres pour les textes et fonds (palette « slate » de Tailwind)
-- Police de caractères : **Inter**, lisible et largement utilisée sur les produits professionnels
-
-### 6.9 Indicateurs de succès (KPIs) de la V1
-
-- Nombre d'inscrits actifs par type de profil
-- Taux de candidatures ayant reçu une réponse de l'entreprise
-- Score moyen de matching des candidatures envoyées
-- Temps moyen entre le dépôt d'une candidature et l'embauche
+- **`passlib` est abandonnée par ses créateurs et casse avec les versions récentes de `bcrypt`.** Le hash des mots de passe passe maintenant directement par la librairie `bcrypt`, sans intermédiaire. Ne pas réinstaller `passlib`.
+- **La règle Ruff `B008`** (qui critique l'usage de `Depends(...)` dans les arguments par défaut) est un faux positif avec FastAPI — c'est le fonctionnement normal du framework. Elle a été désactivée volontairement dans `pyproject.toml`, ce n'est pas un oubli.
+- **pgvector n'est pas installé** sur la base PostgreSQL locale (nécessiterait une compilation manuelle sous Windows). Sans importance pour l'instant : cette extension ne sert qu'au matching V2, qui est très loin dans l'ordre de réalisation du projet.
+- **Alembic doit connaître TOUS les modèles pour détecter les changements.** Le fichier `alembic/env.py` importe chaque fichier de modèle (`from app.models import offre, profiles, user`) uniquement pour que Python les charge en mémoire — sans cet import, Alembic ne "voit" pas les nouvelles tables et génère des migrations vides (juste `pass`). À chaque nouveau fichier de modèle créé, il faut penser à l'ajouter à cet import — piège rencontré deux fois de suite sur ce projet.
+- **Les migrations auto-générées par Alembic oublient systématiquement l'import du type `GUID`.** Alembic écrit son chemin complet (`app.core.types.GUID()`) dans le fichier de migration mais n'ajoute jamais l'import correspondant — il faut l'ajouter à la main (`from app.core.types import GUID`) et retirer le préfixe `app.core.types.` de chaque usage, à chaque nouvelle migration qui touche une table avec un identifiant UUID.
+- **Bien vérifier le contenu de chaque fichier créé avant de passer au suivant.** Sur ce projet, le contenu du fichier de schémas (`app/schemas/offre.py`) a été collé par erreur dans le fichier du modèle (`app/models/offre.py`), et le vrai fichier de schéma n'a jamais été créé — ce qui a fait perdre du temps à déboguer une migration vide puis une erreur d'import, alors que la cause racine était une simple confusion de fichiers en cours de copier-coller.
+- **Ajouter une valeur à un `Enum` PostgreSQL existant n'est jamais détecté par l'autogénération d'Alembic.** Contrairement à l'ajout d'une colonne ou d'une table, il faut toujours ajouter manuellement une ligne `op.execute("ALTER TYPE nom_enum ADD VALUE IF NOT EXISTS 'nouvelle_valeur'")` dans le fichier de migration généré.
+- **Si une migration a déjà été marquée comme "appliquée" par Alembic avant d'y ajouter une modification manuelle, `alembic upgrade head` ne rejouera pas cette modification.** Dans ce cas, il faut soit exécuter le SQL manquant directement en base (comme cela a été fait une fois pour rattraper une valeur d'enum oubliée), soit downgrader puis re-upgrader la migration concernée. Toujours vérifier `alembic current` en cas de doute sur ce qui a réellement été appliqué.
+- **Après avoir ajouté un nouveau paramètre à une fonction partagée (comme `calculer_score_matching`), il faut vérifier TOUS les endroits qui l'appellent, pas seulement celui qu'on a en tête.** Un des trois routeurs qui appellent le moteur de matching avait été oublié lors de l'ajout du TJM, ce qui a fait échouer silencieusement le nouveau calcul sans lever d'erreur (la fonction utilisait juste ses valeurs par défaut). Une recherche du nom de la fonction dans tout le projet avant de considérer une modification "terminée" aurait évité ce détour.
 
 ---
 
-## 7. Fondations techniques mises en place (au-delà du cahier des charges initial)
+## 5. Pour reprendre rapidement la prochaine fois
 
-Ces éléments ne figuraient pas explicitement dans le cahier des charges mais sont des bonnes pratiques indispensables pour un projet destiné à durer :
-
-- **Git** : le projet est maintenant suivi par un système de versioning, avec un historique de chaque modification.
-- **Structure de dossiers claire** : backend organisé en `routers/`, `models/`, `schemas/`, `services/`, `core/` ; frontend organisé en `pages/`, `components/`, `api/`, `hooks/`, `types/`.
-- **Base de données locale via Docker** : plutôt que de dépendre de Supabase (en ligne) dès le développement, une base PostgreSQL identique tourne en local sur la machine, avec l'extension pgvector déjà activée (utile aussi bien en V1 qu'en V2). Le code écrit sera directement compatible avec Supabase au moment du déploiement.
-
-## 8. Journal d'avancement (état au 04/09/2026)
-
-### Ce qui est fait et fonctionnel
-
-- **Projet Git** initialisé et poussé sur GitHub : https://github.com/GCS2092/talent-d-afrique
-- **Structure de dossiers** complète (backend en `app/{core,routers,models,schemas,services}`, frontend en `src/{pages,components,api,hooks,types}`)
-- **Base de données PostgreSQL locale** (via pgAdmin4) connectée et fonctionnelle — pgvector volontairement laissé de côté pour l'instant (utile seulement à partir de l'étape 12, matching V2)
-- **Backend FastAPI complet pour le socle d'authentification** :
-  - `app/models/user.py` — modèle `User` avec UUID portable et champs RGPD (consentement horodaté et versionné, suppression logique)
-  - `app/core/security.py` — hash bcrypt (implémentation directe, sans passlib — voir point de vigilance ci-dessous) et gestion des tokens JWT
-  - `app/schemas/user.py` — validation des données d'entrée/sortie
-  - `app/routers/auth.py` — routes `/api/auth/register` et `/api/auth/login`, avec gestion des doublons d'email et des mots de passe incorrects
-  - **Testé de bout en bout avec succès** : inscription, connexion, doublon d'email rejeté, mot de passe erroné rejeté
-- **Qualité de code en place** : Ruff configuré, pre-commit installé
-- **Frontend React + Vite + Tailwind CSS v4 entièrement routé et connecté au backend** :
-  - Toutes les pages (Accueil, Inscription, Connexion, CGU, Confidentialité, 4 dashboards, 404)
-  - `api/client.ts` et `api/auth.ts` — connexion réelle à l'API backend via axios
-  - Formulaires d'inscription et de connexion branchés sur les vraies routes, avec affichage des erreurs serveur (ex : email déjà utilisé)
-  - Menu mobile responsive (hamburger) dans le header
-  - **Testé de bout en bout avec succès** : inscription depuis le frontend → sauvegarde réelle en base → redirection vers le bon dashboard ; connexion → récupération d'un token JWT
-- **Scripts pratiques** dans `scripts/` : `install.ps1`, `dev.ps1`, `check.ps1`
-- **Toutes les décisions structurantes tranchées** (sécurité, RGPD, pondération du matching, charte graphique, KPIs) — voir section 6
-
-### Points de vigilance identifiés en cours de route
-
-- ⚠️ **passlib a été abandonné au profit de la librairie `bcrypt` directe.** passlib (dernière mise à jour en 2020) est incompatible avec les versions récentes de bcrypt (bug connu et non corrigé depuis 2023). Le hash reste bcrypt avec un coût de 12, conforme à la décision initiale — seule l'implémentation a changé, pas le niveau de sécurité.
-- ⚠️ **Le token JWT est actuellement stocké dans `localStorage` côté frontend.** C'est suffisant pour tester, mais ce n'est pas la méthode la plus sécurisée (vulnérable en cas de faille XSS). À migrer vers un cookie `httpOnly` avant la mise en production.
-- ⚠️ **`Base.metadata.create_all()` est utilisé pour créer les tables automatiquement en développement.** Cette méthode ne doit pas servir en production — Alembic (déjà installé) devra prendre le relai avec de vraies migrations avant le déploiement.
-- ⚠️ pgvector n'est pas installé sur l'instance PostgreSQL locale (nécessite une compilation manuelle sous Windows, mise de côté pour l'instant). À réévaluer à l'approche de l'étape 12 (matching V2), ou réglé automatiquement si bascule vers Supabase (qui l'a nativement).
-
-### Ce qui N'EST PAS encore fait
-
-- ❌ Bascule vers Supabase en production (actuellement tout tourne sur la base PostgreSQL locale via pgAdmin4)
-- ❌ Migrations Alembic proprement configurées
-- ❌ Route de récupération du profil utilisateur connecté (`/me`), export RGPD, suppression de compte
-- ❌ Protection des routes par JWT (middleware de vérification du token sur les futures routes sensibles)
-- ❌ Étape 2 du cahier des charges : profils complets (entreprise, étudiant, école, freelance) et parsing de CV
-
-### Prochaines étapes, dans l'ordre
-
-1. Ajouter une route `/api/auth/me` protégée par JWT, pour récupérer les infos de l'utilisateur connecté
-2. Gérer la persistance de session côté frontend (afficher "Connecté en tant que..." dans le header, bouton de déconnexion)
-3. Attaquer l'étape 2 du cahier des charges : construire les profils complets par type d'utilisateur
-4. Revenir sur les points de vigilance (cookie httpOnly, Alembic) avant toute mise en ligne réelle
-
-Cette liste correspond à la fin de l'étape 1 du cahier des charges (section 7) et au tout début de l'étape 2.
+1. Relance la base PostgreSQL locale (pgAdmin4) et le backend :
+   ```
+   cd backend
+   .\venv\Scripts\Activate.ps1
+   uvicorn app.main:app --reload
+   ```
+2. Va sur `http://localhost:8000/docs`, ou lance les scripts de test existants (`test-matching.ps1`, `test-filtres.ps1`, `test-ecole.ps1`, `test-freelance.ps1`) pour valider rapidement que tout fonctionne toujours après une modification.
+3. Le prochain chantier logique est l'**étape 9** du cahier des charges : les notifications in-app et email sur les événements clés (candidature reçue, changement de statut, nouvelle offre correspondant au profil). Resend est déjà installé mais jamais branché à une vraie route.
+4. **Rappel méthodologique** pour chaque nouveau modèle de données à venir : (1) créer le modèle dans `app/models/`, (2) l'ajouter à l'import dans `alembic/env.py`, (3) créer le schéma dans `app/schemas/`, (4) créer les routes, (5) générer la migration et **vérifier son contenu avant de l'appliquer** (elle ne doit jamais contenir juste `pass`, et l'import de `GUID` doit être ajouté à la main si la table utilise des UUID).

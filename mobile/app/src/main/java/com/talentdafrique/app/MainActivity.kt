@@ -1,0 +1,97 @@
+package com.talentdafrique.app
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import com.talentdafrique.app.data.remote.dto.TypeProfil
+import com.talentdafrique.app.data.repository.AuthRepository
+import com.talentdafrique.app.ui.navigation.Routes
+import com.talentdafrique.app.ui.navigation.TalentDAfriqueNavGraph
+import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    TalentDAfriqueRoot()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * État initial : le temps de lire le DataStore (isLoggedIn) et, si connecté,
+ * de récupérer le type de profil (pour savoir quel HomeScreen afficher), on
+ * affiche un simple spinner. Une fois résolu, on lance le NavGraph avec le
+ * bon point de départ.
+ */
+@Composable
+fun TalentDAfriqueRoot(viewModel: SessionViewModel = viewModel()) {
+    val state by viewModel.state.collectAsState()
+
+    when (val current = state) {
+        is SessionState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is SessionState.Resolved -> {
+            TalentDAfriqueNavGraph(
+                startDestination = if (current.isLoggedIn) Routes.HOME else Routes.LOGIN,
+                userTypeProfil = current.typeProfil ?: TypeProfil.ETUDIANT,
+            )
+        }
+    }
+}
+
+sealed interface SessionState {
+    data object Loading : SessionState
+    data class Resolved(val isLoggedIn: Boolean, val typeProfil: TypeProfil?) : SessionState
+}
+
+@HiltViewModel
+class SessionViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+) : ViewModel() {
+
+    private val _state = MutableStateFlow<SessionState>(SessionState.Loading)
+    val state: StateFlow<SessionState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            authRepository.isLoggedIn.collect { loggedIn ->
+                if (!loggedIn) {
+                    _state.value = SessionState.Resolved(isLoggedIn = false, typeProfil = null)
+                } else {
+                    val meResult = authRepository.me()
+                    val typeProfil = (meResult as? com.talentdafrique.app.data.repository.Result.Success)
+                        ?.data?.typeProfil
+                    _state.value = SessionState.Resolved(isLoggedIn = true, typeProfil = typeProfil)
+                }
+            }
+        }
+    }
+}

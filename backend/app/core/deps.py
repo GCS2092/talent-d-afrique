@@ -1,19 +1,22 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.models.user import User
 
-bearer_scheme = HTTPBearer()
-
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    access_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> User:
-    payload = decode_token(credentials.credentials)
+    if access_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Non authentifie.",
+        )
+
+    payload = decode_token(access_token)
 
     if payload is None or payload.get("type") != "access":
         raise HTTPException(

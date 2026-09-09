@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.limiter import limiter
@@ -14,16 +15,32 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from app.schemas.user import (
-    AccessTokenOut,
-    RefreshRequest,
-    Token,
-    UserCreate,
-    UserLogin,
-    UserOut,
-)
+from app.schemas.user import RefreshRequest, UserCreate, UserLogin, UserOut
 
 router = APIRouter()
+
+COOKIE_SECURE = settings.environment == "production"
+
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
+        path="/",
+    )
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -57,9 +74,9 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
     return user
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=UserOut)
 @limiter.limit("10/minute")
-def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
+def login(request: Request, response: Response, payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
 
     if not user or not verify_password(payload.mot_de_passe, user.mot_de_passe_hash):
@@ -74,15 +91,31 @@ def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
             detail="Ce compte est desactive.",
         )
 
-    return Token(
-        access_token=create_access_token(str(user.id)),
-        refresh_token=create_refresh_token(str(user.id)),
-    )
+    access_token = create_access_token(str(user.id))
+    refresh_token = create_refresh_token(str(user.id))
+    _set_auth_cookies(response, access_token, refresh_token)
+
+    return user
 
 
-@router.post("/refresh", response_model=AccessTokenOut)
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
-    token_data = decode_token(payload.refresh_token)
+@router.post("/refresh", response_model=UserOut)
+def refresh(
+    request: Request,
+    response: Response,
+    payload: RefreshRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token is None and payload is not None:
+        refresh_token = payload.refresh_token
+
+    if refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token manquant.",
+        )
+
+    token_data = decode_token(refresh_token)
 
     if token_data is None or token_data.get("type") != "refresh":
         raise HTTPException(
@@ -97,7 +130,25 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
             detail="Utilisateur introuvable ou compte desactive.",
         )
 
-    return AccessTokenOut(access_token=create_access_token(str(user.id)))
+    new_access_token = create_access_token(str(user.id))
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+
+    return user
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    return {"message": "Deconnecte."}
 
 
 @router.get("/me", response_model=UserOut)

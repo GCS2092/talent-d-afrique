@@ -15,7 +15,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from app.schemas.user import RefreshRequest, UserCreate, UserLogin, UserOut
+from app.schemas.user import RefreshRequest, TokenResponse, UserCreate, UserLogin, UserOut
 
 router = APIRouter()
 
@@ -43,9 +43,9 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
     )
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
-def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
+def register(request: Request, response: Response, payload: UserCreate, db: Session = Depends(get_db)):
     if not payload.consentement:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -71,10 +71,18 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
     db.commit()
     db.refresh(user)
 
-    return user
+    access_token = create_access_token(str(user.id))
+    refresh_token = create_refresh_token(str(user.id))
+    _set_auth_cookies(response, access_token, refresh_token)
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=user,
+    )
 
 
-@router.post("/login", response_model=UserOut)
+@router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def login(request: Request, response: Response, payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
@@ -95,10 +103,14 @@ def login(request: Request, response: Response, payload: UserLogin, db: Session 
     refresh_token = create_refresh_token(str(user.id))
     _set_auth_cookies(response, access_token, refresh_token)
 
-    return user
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=user,
+    )
 
 
-@router.post("/refresh", response_model=UserOut)
+@router.post("/refresh", response_model=TokenResponse)
 def refresh(
     request: Request,
     response: Response,
@@ -131,6 +143,7 @@ def refresh(
         )
 
     new_access_token = create_access_token(str(user.id))
+    new_refresh_token = create_refresh_token(str(user.id))
     response.set_cookie(
         key="access_token",
         value=new_access_token,
@@ -140,8 +153,21 @@ def refresh(
         max_age=settings.access_token_expire_minutes * 60,
         path="/",
     )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
+        path="/",
+    )
 
-    return user
+    return TokenResponse(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        user=user,
+    )
 
 
 @router.post("/logout")

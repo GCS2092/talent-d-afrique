@@ -18,9 +18,9 @@ android {
         versionName = "0.1.0"
 
         // Change en fonction de ton environnement :
-        // - "http://10.0.2.2:8000/" pour l'émulateur Android qui pointe vers ton localhost
+        // - "http://10.0.2.2:8000/api/" pour l'émulateur Android qui pointe vers ton localhost
         // - l'URL Supabase / prod une fois déployé
-        buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000/\"")
+        buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000/api/\"")
     }
 
     buildTypes {
@@ -28,7 +28,7 @@ android {
             isMinifyEnabled = false
         }
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000/\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000/api/\"")
         }
     }
 

@@ -66,6 +66,11 @@ class ProfileViewModel @Inject constructor(
             }
         }
     }
+        fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+        }
+    }
 
     fun uploadCv(file: File) {
         viewModelScope.launch {

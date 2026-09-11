@@ -1,5 +1,5 @@
 package com.talentdafrique.app
-
+import com.talentdafrique.app.ui.theme.TalentDAfriqueTheme
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            TalentDAfriqueTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     TalentDAfriqueRoot()
                 }

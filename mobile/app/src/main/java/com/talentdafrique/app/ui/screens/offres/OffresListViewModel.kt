@@ -16,6 +16,7 @@ data class OffresListUiState(
     val isLoading: Boolean = true,
     val offres: List<OffreDto> = emptyList(),
     val errorMessage: String? = null,
+    val selectedType: String? = null,
 )
 
 @HiltViewModel
@@ -30,10 +31,15 @@ class OffresListViewModel @Inject constructor(
         loadOffres()
     }
 
+    fun onTypeFilterSelected(type: String?) {
+        _uiState.value = _uiState.value.copy(selectedType = type)
+        loadOffres()
+    }
+
     fun loadOffres() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            when (val result = offresRepository.listOffres()) {
+            when (val result = offresRepository.listOffres(typeContrat = _uiState.value.selectedType)) {
                 is Result.Success -> _uiState.value = _uiState.value.copy(isLoading = false, offres = result.data)
                 is Result.Error -> _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = result.message)
             }

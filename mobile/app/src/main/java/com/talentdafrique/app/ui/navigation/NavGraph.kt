@@ -1,9 +1,22 @@
 package com.talentdafrique.app.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.talentdafrique.app.data.remote.dto.TypeProfil
 import com.talentdafrique.app.ui.screens.auth.LoginScreen
@@ -28,54 +41,131 @@ object Routes {
     fun offreDetail(offreId: String) = "offre/$offreId"
 }
 
+private val mainRoutes = setOf(
+    Routes.HOME,
+    Routes.OFFRES,
+    Routes.CANDIDATURES,
+    Routes.NOTIFICATIONS,
+    Routes.PROFILE,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TalentDAfriqueNavGraph(
     navController: NavHostController = rememberNavController(),
     startDestination: String = Routes.LOGIN,
     userTypeProfil: TypeProfil = TypeProfil.ETUDIANT,
 ) {
-    NavHost(navController = navController, startDestination = startDestination) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
-        composable(Routes.LOGIN) {
-            LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate(Routes.HOME) { popUpTo(Routes.LOGIN) { inclusive = true } }
-                },
-                onNavigateToRegister = { navController.navigate(Routes.REGISTER) },
-            )
+    Scaffold(
+        bottomBar = {
+            if (currentRoute in mainRoutes) {
+                TalentDAfriqueBottomBar(navController)
+            }
+        },
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.padding(innerPadding),
+        ) {
+            composable(Routes.LOGIN) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.LOGIN) { inclusive = true }
+                        }
+                    },
+                    onNavigateToRegister = { navController.navigate(Routes.REGISTER) },
+                )
+            }
+
+            composable(Routes.REGISTER) {
+                RegisterScreen(
+                    onRegisterSuccess = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.LOGIN) { inclusive = true }
+                        }
+                    },
+                    onNavigateToLogin = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.HOME) {
+                Scaffold(topBar = { TopAppBar(title = { Text("Talent d'Afrique") }) }) { padding ->
+                    Box(Modifier.padding(padding)) {
+                        HomeScreen(
+                            typeProfil = userTypeProfil,
+                            onOffreClick = { offreId -> navController.navigate(Routes.offreDetail(offreId)) },
+                            onSeeAllOffresClick = {
+                                navController.navigate(Routes.OFFRES) {
+                                    launchSingleTop = true
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
+            composable(Routes.OFFRES) {
+                Scaffold(topBar = { TopAppBar(title = { Text("Offres") }) }) { padding ->
+                    Box(Modifier.padding(padding)) {
+                        OffresListScreen(
+                            onOffreClick = { offreId -> navController.navigate(Routes.offreDetail(offreId)) },
+                        )
+                    }
+                }
+            }
+
+            composable(Routes.OFFRE_DETAIL) {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Détail de l'offre") },
+                            navigationIcon = {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowBack,
+                                        contentDescription = "Retour",
+                                    )
+                                }
+                            },
+                        )
+                    },
+                ) { padding ->
+                    Box(Modifier.padding(padding)) {
+                        OffreDetailScreen(
+                            onCandidatureEnvoyee = { navController.popBackStack() },
+                        )
+                    }
+                }
+            }
+
+            composable(Routes.CANDIDATURES) {
+                Scaffold(topBar = { TopAppBar(title = { Text("Mes candidatures") }) }) { padding ->
+                    Box(Modifier.padding(padding)) {
+                        CandidaturesScreen()
+                    }
+                }
+            }
+
+            composable(Routes.NOTIFICATIONS) {
+                Scaffold(topBar = { TopAppBar(title = { Text("Notifications") }) }) { padding ->
+                    Box(Modifier.padding(padding)) {
+                        NotificationsScreen()
+                    }
+                }
+            }
+
+            composable(Routes.PROFILE) {
+                Scaffold(topBar = { TopAppBar(title = { Text("Mon profil") }) }) { padding ->
+                    Box(Modifier.padding(padding)) {
+                        ProfileScreen()
+                    }
+                }
+            }
         }
-
-        composable(Routes.REGISTER) {
-            RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(Routes.HOME) { popUpTo(Routes.LOGIN) { inclusive = true } }
-                },
-                onNavigateToLogin = { navController.popBackStack() },
-            )
-        }
-
-        composable(Routes.HOME) {
-            HomeScreen(
-                typeProfil = userTypeProfil,
-                onOffreClick = { offreId -> navController.navigate(Routes.offreDetail(offreId)) },
-                onSeeAllOffresClick = { navController.navigate(Routes.OFFRES) },
-            )
-        }
-
-        composable(Routes.OFFRES) {
-            OffresListScreen(
-                onOffreClick = { offreId -> navController.navigate(Routes.offreDetail(offreId)) },
-            )
-        }
-
-        composable(Routes.OFFRE_DETAIL) {
-            OffreDetailScreen(
-                onCandidatureEnvoyee = { navController.popBackStack() },
-            )
-        }
-
-        composable(Routes.CANDIDATURES) { CandidaturesScreen() }
-        composable(Routes.NOTIFICATIONS) { NotificationsScreen() }
-        composable(Routes.PROFILE) { ProfileScreen() }
     }
 }

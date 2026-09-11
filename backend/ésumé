@@ -1,0 +1,336 @@
+Voici un résumé simple de ce qu'on a construit côté application mobile, sans jargon technique.
+
+## L'idée générale
+
+L'application mobile est la façon dont un étudiant (ou un freelance) va utiliser "Talent d'Afrique" sur son téléphone. Elle se connecte au backend pour afficher les offres, gérer le profil, etc.
+
+## Ce qui a été fait jusqu'ici
+
+**La connexion**
+Un étudiant peut créer un compte et se connecter avec son email et mot de passe. Une fois connecté, l'app se souvient de lui — pas besoin de se reconnecter à chaque fois qu'on rouvre l'app.
+
+**L'écran d'accueil**
+Dès qu'il arrive sur l'app, l'étudiant voit une sélection d'offres d'emploi ou de stages qui lui sont recommandées, classées selon leur compatibilité avec son profil (un pourcentage de correspondance s'affiche sur chaque offre).
+
+**La liste complète des offres**
+Il peut aussi parcourir toutes les offres disponibles, avec des filtres pour n'afficher que les stages, les CDD, les CDI, ou les missions freelance.
+
+**Le détail d'une offre**
+En cliquant sur une offre, il voit tous les détails (description, compétences demandées, rémunération, localisation) et peut postuler directement avec un bouton.
+
+**Le suivi des candidatures**
+Un écran dédié lui permet de voir toutes les candidatures qu'il a envoyées, avec leur statut actuel (reçue, en cours d'examen, entretien programmé, refusée, ou acceptée) — chaque statut est affiché avec une couleur différente pour s'y retrouver facilement.
+
+**Les notifications**
+Il reçoit des notifications (par exemple, si son statut de candidature change) qu'il peut consulter et marquer comme lues.
+
+**Le profil**
+Il peut voir et gérer son profil : ses compétences, sa disponibilité, et surtout envoyer ou remplacer son CV directement depuis l'app. Il peut aussi se déconnecter depuis cet écran.
+
+**La navigation**
+En bas de l'écran, une barre de navigation permet de passer rapidement entre Accueil, Offres, Candidatures, Notifications et Profil — comme sur la plupart des applications modernes.
+
+## Où on en est
+
+On a d'abord fait fonctionner toutes ces connexions avec le backend (ça a pris du temps à cause de plusieurs décalages entre ce que le backend envoyait et ce que l'app attendait). Maintenant que tout fonctionne, on est en train de rendre l'ensemble plus joli et plus moderne visuellement — couleurs, icônes, mise en page — pour que ça ressemble aux applications actuelles plutôt qu'à une version "brute" de développement.
+
+**Ce qui reste à faire** : finir la modernisation visuelle de tous les écrans, et plus tard, construire les écrans équivalents pour les autres types d'utilisateurs (entreprises et écoles), qui ont des besoins différents (publier des offres, gérer les candidatures reçues, suivre leurs étudiants).
+# -*- coding: utf-8 -*-
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    PageBreak, HRFlowable, ListFlowable, ListItem
+)
+
+PRIMARY = colors.HexColor("#1B7A5C")
+SECONDARY = colors.HexColor("#E8792E")
+DARK = colors.HexColor("#1F2421")
+GREY = colors.HexColor("#6B6F6A")
+LIGHT_BG = colors.HexColor("#F0F0EC")
+GREEN_BG = colors.HexColor("#D4F1E6")
+
+styles = getSampleStyleSheet()
+
+styles.add(ParagraphStyle(
+    name="CoverTitle", fontName="Helvetica-Bold", fontSize=28,
+    textColor=colors.white, leading=34, alignment=TA_LEFT,
+))
+styles.add(ParagraphStyle(
+    name="CoverSubtitle", fontName="Helvetica", fontSize=14,
+    textColor=colors.white, leading=20, alignment=TA_LEFT,
+))
+styles.add(ParagraphStyle(
+    name="H1", fontName="Helvetica-Bold", fontSize=18,
+    textColor=PRIMARY, spaceBefore=18, spaceAfter=10, leading=22,
+))
+styles.add(ParagraphStyle(
+    name="H2", fontName="Helvetica-Bold", fontSize=13,
+    textColor=DARK, spaceBefore=12, spaceAfter=6, leading=17,
+))
+styles.add(ParagraphStyle(
+    name="BodyText2", fontName="Helvetica", fontSize=10.5,
+    textColor=DARK, leading=15, spaceAfter=8, alignment=TA_LEFT,
+))
+styles.add(ParagraphStyle(
+    name="BulletText", fontName="Helvetica", fontSize=10.5,
+    textColor=DARK, leading=15,
+))
+styles.add(ParagraphStyle(
+    name="SmallGrey", fontName="Helvetica", fontSize=9,
+    textColor=GREY, leading=13,
+))
+styles.add(ParagraphStyle(
+    name="TableHeader", fontName="Helvetica-Bold", fontSize=9.5,
+    textColor=colors.white, leading=12,
+))
+styles.add(ParagraphStyle(
+    name="TableCell", fontName="Helvetica", fontSize=9.5,
+    textColor=DARK, leading=13,
+))
+
+def cover_page(canvas, doc):
+    canvas.saveState()
+    canvas.setFillColor(PRIMARY)
+    canvas.rect(0, 0, A4[0], A4[1], fill=1, stroke=0)
+    canvas.setFillColor(colors.white)
+    canvas.setFont("Helvetica-Bold", 30)
+    canvas.drawString(2.2*cm, A4[1]-6.5*cm, "Talent d'Afrique")
+    canvas.setFont("Helvetica", 16)
+    canvas.drawString(2.2*cm, A4[1]-7.4*cm, "Application mobile — Espace Etudiant")
+    canvas.setFont("Helvetica", 11)
+    canvas.setFillColor(colors.HexColor("#D4F1E6"))
+    canvas.drawString(2.2*cm, A4[1]-8.3*cm, "Rapport de suivi du developpement frontend")
+    canvas.setFont("Helvetica", 10)
+    canvas.drawString(2.2*cm, 2*cm, "Document genere automatiquement — usage interne")
+    canvas.restoreState()
+
+def normal_page(canvas, doc):
+    canvas.saveState()
+    canvas.setFillColor(GREY)
+    canvas.setFont("Helvetica", 8)
+    canvas.drawString(2*cm, 1.2*cm, "Talent d'Afrique — Rapport frontend mobile")
+    canvas.drawRightString(A4[0]-2*cm, 1.2*cm, f"Page {doc.page}")
+    canvas.setStrokeColor(LIGHT_BG)
+    canvas.setLineWidth(1)
+    canvas.line(2*cm, 1.5*cm, A4[0]-2*cm, 1.5*cm)
+    canvas.restoreState()
+
+def bullets(items):
+    return ListFlowable(
+        [ListItem(Paragraph(t, styles["BulletText"]), leftIndent=6, spaceAfter=5) for t in items],
+        bulletType="bullet", start="•", leftIndent=14,
+    )
+
+def section_table(header, rows, col_widths):
+    data = [[Paragraph(h, styles["TableHeader"]) for h in header]] + [
+        [Paragraph(str(c), styles["TableCell"]) for c in row] for row in rows
+    ]
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT_BG]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#DDDED8")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    return t
+
+doc = SimpleDocTemplate(
+    "/home/claude/Talent_Afrique_Rapport_Frontend_Mobile.pdf",
+    pagesize=A4,
+    leftMargin=2*cm, rightMargin=2*cm,
+    topMargin=2*cm, bottomMargin=2*cm,
+    title="Talent d'Afrique - Rapport Frontend Mobile",
+    author="Talent d'Afrique",
+)
+
+story = []
+
+# ---------- Page de garde ----------
+story.append(Spacer(1, 1))
+story.append(PageBreak())
+
+# ---------- 1. Contexte ----------
+story.append(Paragraph("1. Contexte et objectif", styles["H1"]))
+story.append(Paragraph(
+    "L'application mobile Talent d'Afrique permet aux etudiants et freelances de trouver des offres "
+    "d'emploi, de stage ou de mission, de postuler directement depuis leur telephone, et de suivre "
+    "l'avancement de leurs candidatures. Ce document resume l'etat d'avancement du developpement de "
+    "l'espace <b>Etudiant</b> de l'application, les problemes rencontres et corriges au cours du "
+    "developpement, ainsi que les prochaines etapes.",
+    styles["BodyText2"]
+))
+story.append(Paragraph(
+    "L'application est construite en Kotlin (Android natif, avec Jetpack Compose pour l'interface) et "
+    "communique avec un serveur backend (FastAPI / Python) qui gere les comptes, les offres, les "
+    "candidatures et les notifications.",
+    styles["BodyText2"]
+))
+
+# ---------- 2. Ecrans livres ----------
+story.append(Paragraph("2. Ecrans realises pour l'espace Etudiant", styles["H1"]))
+story.append(Paragraph(
+    "Sept ecrans principaux ont ete construits, couvrant l'integralite du parcours d'un etudiant "
+    "dans l'application, de la connexion a la gestion de son profil.",
+    styles["BodyText2"]
+))
+
+ecrans = [
+    ("Accueil", "Affiche les offres recommandees pour l'utilisateur, classees selon un score de "
+     "compatibilite calcule par le backend (competences, disponibilite, experience)."),
+    ("Liste des offres", "Parcours de toutes les offres disponibles, avec des filtres par type de "
+     "contrat (stage, CDD, CDI, mission freelance)."),
+    ("Detail d'une offre", "Description complete de l'offre, competences demandees, remuneration, "
+     "score de correspondance, et bouton pour postuler en un clic."),
+    ("Mes candidatures", "Suivi de toutes les candidatures envoyees, avec un badge de couleur "
+     "indiquant le statut : recue, en cours, entretien, refusee ou acceptee."),
+    ("Notifications", "Liste des notifications recues (changement de statut, nouvelles offres), "
+     "avec possibilite de les marquer comme lues."),
+    ("Mon profil", "Consultation et mise a jour du profil etudiant : competences, disponibilite, "
+     "et envoi ou remplacement du CV. Comprend aussi la deconnexion."),
+    ("Connexion / Inscription", "Creation de compte et authentification, avec gestion automatique "
+     "de la session (l'utilisateur reste connecte entre deux ouvertures de l'application)."),
+]
+story.append(section_table(
+    ["Ecran", "Fonction"],
+    ecrans,
+    col_widths=[3.8*cm, 11.2*cm],
+))
+
+story.append(Spacer(1, 10))
+story.append(Paragraph(
+    "Une barre de navigation basse (Accueil / Offres / Candidatures / Notifications / Profil) a ete "
+    "mise en place pour permettre de circuler rapidement entre les ecrans principaux, a la maniere "
+    "des applications mobiles courantes. Un bouton de retour a egalement ete ajoute sur les ecrans "
+    "secondaires, comme le detail d'une offre.",
+    styles["BodyText2"]
+))
+
+# ---------- 3. Problemes rencontres ----------
+story.append(Paragraph("3. Principaux problemes identifies et corriges", styles["H1"]))
+story.append(Paragraph(
+    "La mise en place de la connexion entre l'application mobile et le serveur backend a revele "
+    "plusieurs incoherences, corrigees une par une. Le tableau ci-dessous resume les principaux "
+    "points bloquants rencontres.",
+    styles["BodyText2"]
+))
+
+problemes = [
+    ("Adresse des routes API",
+     "L'application appelait les routes du serveur sans le prefixe attendu (ex: /auth/login au lieu "
+     "de /api/auth/login), provoquant des erreurs 404 systematiques.",
+     "Corrige : ajustement de l'adresse de base utilisee par l'application."),
+    ("Authentification refusee (403 / 401)",
+     "Le serveur verifiait la connexion de l'utilisateur uniquement via un cookie de session, alors "
+     "que l'application mobile envoie un jeton d'acces dans l'en-tete de chaque requete.",
+     "Corrige : le serveur accepte desormais les deux methodes d'authentification."),
+    ("Jeton de connexion manquant",
+     "Apres connexion, le serveur ne renvoyait que les informations du compte, sans le jeton d'acces "
+     "attendu par l'application pour rester connectee.",
+     "Corrige : le serveur renvoie maintenant le jeton d'acces avec les informations du compte."),
+    ("Champs de donnees incompatibles",
+     "Plusieurs champs (competences, description, remuneration, notes) avaient un format different "
+     "entre ce que le serveur envoie reellement et ce que l'application attendait (texte au lieu de "
+     "liste, valeur optionnelle non prevue, etc.), provoquant des plantages a l'affichage.",
+     "Corrige : verification systematique de chaque ecran contre le format reel du serveur."),
+    ("Candidature sans nom d'offre",
+     "L'ecran de suivi des candidatures n'affichait pas le titre de l'offre correspondante, cette "
+     "information n'etait pas incluse dans la reponse du serveur.",
+     "Corrige : le serveur inclut desormais les details de l'offre dans chaque candidature."),
+    ("Icone de compte desactive non geree",
+     "Un compte de test etait marque comme desactive en base de donnees, provoquant un refus de "
+     "connexion sans message clair.",
+     "Identifie : necessite une verification manuelle des comptes de test en base de donnees."),
+]
+
+for titre, desc, statut in problemes:
+    story.append(Paragraph(f"<b>{titre}</b>", styles["H2"]))
+    story.append(Paragraph(desc, styles["BodyText2"]))
+    story.append(Paragraph(f"<i>{statut}</i>", styles["SmallGrey"]))
+    story.append(Spacer(1, 4))
+
+# ---------- 4. Design ----------
+story.append(PageBreak())
+story.append(Paragraph("4. Modernisation du design", styles["H1"]))
+story.append(Paragraph(
+    "Une fois les ecrans fonctionnels, une passe de modernisation visuelle a ete engagee afin que "
+    "l'application se rapproche des standards actuels (Material Design 3), plutot que de garder "
+    "l'apparence generique par defaut.",
+    styles["BodyText2"]
+))
+
+story.append(Paragraph("Elements mis en place :", styles["H2"]))
+story.append(bullets([
+    "Palette de couleurs propre a la marque (vert principal, orange secondaire) plutot que le violet "
+    "par defaut de Google.",
+    "Typographie retravaillee (tailles, graisses) pour une meilleure hierarchie visuelle des titres "
+    "et textes.",
+    "Remplacement des emojis provisoires par de veritables icones vectorielles (accueil, offres, "
+    "candidatures, notifications, profil).",
+    "Cartes d'offres redessinees avec badges colores (type de contrat, pourcentage de compatibilite).",
+    "Badges de couleur distincts pour chaque statut de candidature (gris, orange, bleu, rouge, vert).",
+    "Ecrans d'etat harmonises (chargement, erreur, contenu vide) avec icones et messages clairs sur "
+    "tous les ecrans plutot que de simples textes bruts.",
+    "Ajout d'un avatar, d'un en-tete de bienvenue sur l'accueil, et de filtres visuels sur la liste "
+    "des offres.",
+    "Ajout de la fonctionnalite de deconnexion, absente jusqu'ici.",
+]))
+
+story.append(Paragraph(
+    "Cette modernisation est en cours de finalisation ; quelques ajustements graphiques "
+    "supplementaires restent a apporter selon les retours utilisateurs.",
+    styles["BodyText2"]
+))
+
+# ---------- 5. Architecture ----------
+story.append(Paragraph("5. Organisation technique (simplifiee)", styles["H1"]))
+story.append(Paragraph(
+    "Pour chaque fonctionnalite (offres, candidatures, profil, notifications), l'application suit "
+    "la meme organisation en trois couches, ce qui facilite la maintenance et l'ajout de nouvelles "
+    "fonctionnalites :",
+    styles["BodyText2"]
+))
+story.append(bullets([
+    "<b>Communication avec le serveur</b> — le code qui sait comment appeler chaque route du backend.",
+    "<b>Logique metier</b> — le code qui recupere les donnees, gere le chargement et les erreurs.",
+    "<b>Affichage</b> — les ecrans que l'utilisateur voit et avec lesquels il interagit.",
+]))
+story.append(Paragraph(
+    "Cette separation permet, par exemple, de corriger un probleme de communication avec le serveur "
+    "sans toucher a l'affichage, ou inversement de retravailler le design d'un ecran sans risquer de "
+    "casser la recuperation des donnees.",
+    styles["BodyText2"]
+))
+
+# ---------- 6. Prochaines etapes ----------
+story.append(Paragraph("6. Prochaines etapes", styles["H1"]))
+story.append(bullets([
+    "Finaliser la modernisation visuelle des derniers ecrans (detail d'offre, formulaires).",
+    "Mettre a jour la bibliotheque d'icones vers une version plus recente, dans une session dediee "
+    "afin de limiter les risques sur le reste de l'application.",
+    "Construire les ecrans equivalents pour les autres types de comptes : entreprises (publication "
+    "d'offres, gestion des candidatures recues) et ecoles (suivi des etudiants rattaches).",
+    "Verifier et, si necessaire, reactiver les comptes de test marques comme desactives en base de "
+    "donnees.",
+    "Mettre en place des tests automatiques pour eviter que de nouveaux ecarts entre le serveur et "
+    "l'application ne passent inapercus a l'avenir.",
+]))
+
+story.append(Spacer(1, 16))
+story.append(HRFlowable(width="100%", thickness=1, color=LIGHT_BG))
+story.append(Spacer(1, 8))
+story.append(Paragraph(
+    "Document genere a partir du suivi de developpement de l'application mobile Talent d'Afrique.",
+    styles["SmallGrey"]
+))
+
+doc.build(story, onFirstPage=cover_page, onLaterPages=normal_page)
+print("OK")

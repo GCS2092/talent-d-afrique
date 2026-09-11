@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.offre import OffreOut
+
 
 class CandidatureCreate(BaseModel):
     offre_id: uuid.UUID
@@ -21,6 +23,7 @@ class CandidatureOut(BaseModel):
     message: str | None
     statut: str
     created_at: datetime
+    offre: OffreOut | None = None
 
     class Config:
         from_attributes = True

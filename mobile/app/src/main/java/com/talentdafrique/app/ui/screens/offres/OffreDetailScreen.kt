@@ -62,12 +62,12 @@ fun OffreDetailScreen(
                 )
 
                 offre.remuneration?.let {
-                    Text(text = it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                    Text(text = "$it €", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
                 }
 
-                offre.matching?.let { matching ->
+                offre.scoreGlobal?.let { score ->
                     Text(
-                        text = "Score de correspondance : ${(matching.scoreGlobal * 100).toInt()}%",
+                        text = "Score de correspondance : ${(score * 100).toInt()}%",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 16.dp),
@@ -75,16 +75,16 @@ fun OffreDetailScreen(
                 }
 
                 Text(text = "Description", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp))
-                Text(text = offre.description, modifier = Modifier.padding(top = 8.dp))
+                Text(text = offre.description ?: "Aucune description fournie.", modifier = Modifier.padding(top = 8.dp))
 
-                if (offre.competencesObligatoires.isNotEmpty()) {
+                offre.competencesObligatoires?.let {
                     Text(text = "Compétences requises", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp))
-                    Text(text = offre.competencesObligatoires.joinToString(", "), modifier = Modifier.padding(top = 8.dp))
+                    Text(text = it, modifier = Modifier.padding(top = 8.dp))
                 }
 
-                if (offre.competencesSouhaitees.isNotEmpty()) {
+                offre.competencesSouhaitees?.let {
                     Text(text = "Compétences souhaitées", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
-                    Text(text = offre.competencesSouhaitees.joinToString(", "), modifier = Modifier.padding(top = 8.dp))
+                    Text(text = it, modifier = Modifier.padding(top = 8.dp))
                 }
 
                 uiState.postulerError?.let { message ->

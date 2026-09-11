@@ -21,7 +21,7 @@ interface CandidaturesApi {
     suspend fun mesCandidatures(): List<CandidatureDto>
 
     /** Candidatures reçues sur une offre (côté entreprise), avec filtres du dashboard. */
-    @GET("offres/{offreId}/candidatures")
+    @GET("candidatures/offre/{offreId}")
     suspend fun candidaturesRecues(
         @Path("offreId") offreId: String,
         @Query("score_min") scoreMin: Int? = null,

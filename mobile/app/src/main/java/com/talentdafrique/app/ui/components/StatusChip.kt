@@ -1,7 +1,6 @@
 package com.talentdafrique.app.ui.components
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -10,23 +9,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.talentdafrique.app.data.remote.dto.StatutCandidature
+import com.talentdafrique.app.ui.theme.StatusAcceptee
+import com.talentdafrique.app.ui.theme.StatusEnCours
+import com.talentdafrique.app.ui.theme.StatusEntretien
+import com.talentdafrique.app.ui.theme.StatusRecue
+import com.talentdafrique.app.ui.theme.StatusRefusee
 
 data class StatusStyle(val label: String, val color: Color)
 
 fun statutCandidatureStyle(statut: StatutCandidature): StatusStyle = when (statut) {
-    StatutCandidature.RECUE -> StatusStyle("Reçue", Color(0xFF6B6F6A))
-    StatutCandidature.EN_COURS -> StatusStyle("En cours", Color(0xFFE8792E))
-    StatutCandidature.ENTRETIEN -> StatusStyle("Entretien", Color(0xFF2E6BE8))
-    StatutCandidature.REFUSEE -> StatusStyle("Refusée", Color(0xFFBA1A1A))
-    StatutCandidature.ACCEPTEE -> StatusStyle("Acceptée", Color(0xFF1B7A5C))
+    StatutCandidature.RECUE -> StatusStyle("Reçue", StatusRecue)
+    StatutCandidature.EN_COURS -> StatusStyle("En cours", StatusEnCours)
+    StatutCandidature.ENTRETIEN -> StatusStyle("Entretien", StatusEntretien)
+    StatutCandidature.REFUSEE -> StatusStyle("Refusée", StatusRefusee)
+    StatutCandidature.ACCEPTEE -> StatusStyle("Acceptée", StatusAcceptee)
 }
 
 @Composable
 fun StatusChip(style: StatusStyle, modifier: Modifier = Modifier) {
     Surface(
-        color = style.color.copy(alpha = 0.12f),
+        color = style.color.copy(alpha = 0.14f),
         contentColor = style.color,
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.extraSmall,
         modifier = modifier,
     ) {
         Text(

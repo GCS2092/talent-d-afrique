@@ -1,5 +1,6 @@
 package com.talentdafrique.app.ui.screens.notifications
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -66,34 +66,50 @@ fun NotificationsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(enabled = !notification.lue) { viewModel.markAsRead(notification.id) },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
                         containerColor = if (notification.lue) {
                             MaterialTheme.colorScheme.surface
                         } else {
-                            MaterialTheme.colorScheme.primaryContainer
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                         },
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = if (notification.lue) 0.dp else 1.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = if (notification.lue) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    } else {
+                        null
+                    },
                 ) {
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            color = if (notification.lue) {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
                             modifier = Modifier.size(40.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Filled.Notifications,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = if (notification.lue) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    },
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
 
-                        Column(modifier = Modifier.padding(start = 12.dp)) {
-                            Text(text = notification.titre, style = MaterialTheme.typography.titleSmall)
+                        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+                            Text(
+                                text = notification.titre,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
                             notification.message?.let {
                                 Text(
                                     text = it,
@@ -102,6 +118,14 @@ fun NotificationsScreen(
                                     modifier = Modifier.padding(top = 2.dp),
                                 )
                             }
+                        }
+
+                        if (!notification.lue) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 4.dp).size(8.dp),
+                            ) {}
                         }
                     }
                 }

@@ -68,14 +68,17 @@ def create_offre(
 @router.get("", response_model=list[OffreOut])
 def list_offres(
     statut: str | None = None,
+    type_contrat: str | None = None,
     db: Session = Depends(get_db),
 ):
-    """Liste publique des offres (pour les candidats) - filtrable par statut."""
+    """Liste publique des offres (pour les candidats) - filtrable par statut et type de contrat."""
     query = db.query(Offre)
     if statut:
         query = query.filter(Offre.statut == statut)
     else:
         query = query.filter(Offre.statut == "active")
+    if type_contrat:
+        query = query.filter(Offre.type_contrat == type_contrat)
     return query.order_by(Offre.created_at.desc()).all()
 
 

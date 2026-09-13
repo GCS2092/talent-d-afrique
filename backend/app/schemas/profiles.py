@@ -1,6 +1,9 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+DisponibiliteCandidat = Literal["immediate", "1_mois", "3_mois", "6_mois"]
 
 
 class EntrepriseProfileIn(BaseModel):
@@ -25,14 +28,21 @@ class EtudiantProfileIn(BaseModel):
     competences: str | None = None
     experiences: str | None = None
     formations: str | None = None
-    disponibilite: str | None = None
+    disponibilite: DisponibiliteCandidat | None = None
     preferences: str | None = None
     ecole_id: uuid.UUID | None = None
 
 
-class EtudiantProfileOut(EtudiantProfileIn):
+class EtudiantProfileOut(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
+    cv_url: str | None = None
+    competences: str | None = None
+    experiences: str | None = None
+    formations: str | None = None
+    disponibilite: str | None = None  # tolerant : ne casse pas la lecture de donnees existantes
+    preferences: str | None = None
+    ecole_id: uuid.UUID | None = None
 
     class Config:
         from_attributes = True
@@ -55,14 +65,19 @@ class EcoleProfileOut(EcoleProfileIn):
 class FreelanceProfileIn(BaseModel):
     competences: str | None = None
     tjm: float | None = Field(default=None, ge=0)
-    disponibilite: str | None = None
+    disponibilite: DisponibiliteCandidat | None = None
     portfolio_url: str | None = None
     annees_experience: int | None = Field(default=None, ge=0)
 
 
-class FreelanceProfileOut(FreelanceProfileIn):
+class FreelanceProfileOut(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
+    competences: str | None = None
+    tjm: float | None = None
+    disponibilite: str | None = None  # tolerant : ne casse pas la lecture de donnees existantes
+    portfolio_url: str | None = None
+    annees_experience: int | None = None
 
     class Config:
         from_attributes = True

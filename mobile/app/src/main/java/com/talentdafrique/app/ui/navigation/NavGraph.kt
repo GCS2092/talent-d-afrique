@@ -1,9 +1,14 @@
 package com.talentdafrique.app.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,7 +23,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.talentdafrique.app.data.remote.dto.TypeProfil
 import com.talentdafrique.app.ui.screens.auth.LoginScreen
 import com.talentdafrique.app.ui.screens.auth.RegisterScreen
 import com.talentdafrique.app.ui.screens.candidatures.CandidaturesScreen
@@ -49,12 +53,19 @@ private val mainRoutes = setOf(
     Routes.PROFILE,
 )
 
+// Durée courte et cohérente pour toutes les transitions — assez rapide pour ne pas
+// ralentir la navigation, assez visible pour ne pas sembler un simple "cut".
+private const val TRANSITION_DURATION_MS = 260
+
+/**
+ * Le mobile est réservé aux étudiants (freelance/entreprise/école restent sur le web) —
+ * plus besoin de paramètre typeProfil ici, HomeScreen n'a qu'un seul chemin.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TalentDAfriqueNavGraph(
     navController: NavHostController = rememberNavController(),
     startDestination: String = Routes.LOGIN,
-    userTypeProfil: TypeProfil = TypeProfil.ETUDIANT,
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -70,6 +81,22 @@ fun TalentDAfriqueNavGraph(
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier.padding(innerPadding),
+            enterTransition = {
+                fadeIn(tween(TRANSITION_DURATION_MS)) +
+                    slideInHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> fullWidth / 6 }
+            },
+            exitTransition = {
+                fadeOut(tween(TRANSITION_DURATION_MS)) +
+                    slideOutHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> -fullWidth / 6 }
+            },
+            popEnterTransition = {
+                fadeIn(tween(TRANSITION_DURATION_MS)) +
+                    slideInHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> -fullWidth / 6 }
+            },
+            popExitTransition = {
+                fadeOut(tween(TRANSITION_DURATION_MS)) +
+                    slideOutHorizontally(tween(TRANSITION_DURATION_MS)) { fullWidth -> fullWidth / 6 }
+            },
         ) {
             composable(Routes.LOGIN) {
                 LoginScreen(
@@ -97,7 +124,6 @@ fun TalentDAfriqueNavGraph(
                 Scaffold(topBar = { TopAppBar(title = { Text("Talent d'Afrique") }) }) { padding ->
                     Box(Modifier.padding(padding)) {
                         HomeScreen(
-                            typeProfil = userTypeProfil,
                             onOffreClick = { offreId -> navController.navigate(Routes.offreDetail(offreId)) },
                             onSeeAllOffresClick = {
                                 navController.navigate(Routes.OFFRES) {
@@ -127,7 +153,7 @@ fun TalentDAfriqueNavGraph(
                             navigationIcon = {
                                 IconButton(onClick = { navController.popBackStack() }) {
                                     Icon(
-                                        imageVector = Icons.Filled.ArrowBack,
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "Retour",
                                     )
                                 }

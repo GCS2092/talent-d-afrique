@@ -81,9 +81,25 @@ def calculer_score_matching(
 ) -> dict:
     """Calcule le score de compatibilite candidat/offre selon la ponderation V1.
     Retourne le score global (0-100) et le detail par critere, pour la
-    transparence demandee dans le cahier des charges (section 3 : 'pourquoi ce score')."""
+    transparence demandee dans le cahier des charges (section 3 : 'pourquoi ce score').
+
+    Si un critere n'a aucun signal fiable (ex : un etudiant n'a pas de nombre
+    d'annees d'experience saisi), il est exclu du calcul du score global plutot
+    que de peser avec une valeur neutre par defaut - cela evite de diluer le
+    score avec un critere non mesure. Le detail reste toutefois affiche pour
+    la transparence, avec le score neutre qu'il aurait eu."""
 
     competences_candidat = _texte_vers_ensemble_competences(candidat_competences)
+
+    est_mission = offre_type_contrat == "mission"
+    experience_score = (
+        _score_tjm(candidat_tjm, offre_budget_tjm)
+        if est_mission
+        else _score_experience(candidat_annees_experience, offre_niveau_experience)
+    )
+    # Signal fiable si : mission (le TJM est toujours renseigne ou neutre a 100),
+    # ou si le candidat a bien un nombre d'annees d'experience saisi.
+    experience_fiable = est_mission or candidat_annees_experience is not None
 
     detail = {
         "competences_obligatoires": _score_couverture(
@@ -94,24 +110,25 @@ def calculer_score_matching(
             _texte_vers_ensemble_competences(offre_competences_souhaitees),
             competences_candidat,
         ),
-        "experience": (
-            _score_tjm(candidat_tjm, offre_budget_tjm)
-            if offre_type_contrat == "mission"
-            else _score_experience(candidat_annees_experience, offre_niveau_experience)
-        ),
+        "experience": experience_score,
         "disponibilite": _score_disponibilite(candidat_disponibilite, offre_disponibilite),
         "soft_skills": _score_couverture(
             _texte_vers_ensemble_competences(offre_soft_skills), competences_candidat
         ),
     }
 
-    score_global = (
-        detail["competences_obligatoires"] * POIDS_COMPETENCES_OBLIGATOIRES
-        + detail["competences_souhaitees"] * POIDS_COMPETENCES_SOUHAITEES
-        + detail["experience"] * POIDS_EXPERIENCE
-        + detail["disponibilite"] * POIDS_DISPONIBILITE
-        + detail["soft_skills"] * POIDS_SOFT_SKILLS
-    ) / 100
+    poids = {
+        "competences_obligatoires": POIDS_COMPETENCES_OBLIGATOIRES,
+        "competences_souhaitees": POIDS_COMPETENCES_SOUHAITEES,
+        "experience": POIDS_EXPERIENCE if experience_fiable else 0,
+        "disponibilite": POIDS_DISPONIBILITE,
+        "soft_skills": POIDS_SOFT_SKILLS,
+    }
+    poids_total = sum(poids.values()) or 1  # evite une division par zero (cas limite improbable)
+
+    # Moyenne ponderee : diviser par poids_total (et non 100 en dur) permet de
+    # renormaliser automatiquement quand un critere est exclu du calcul.
+    score_global = sum(detail[k] * poids[k] for k in detail) / poids_total
 
     return {
         "score_global": round(score_global, 1),
